@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Bun
+bun.lock
+
+# Environment
+.env
+.env.local
+
+# Hermione plans
+.hermes/
+
+# Prototyping / dev history (not part of the extension)
+AGENTS.md
+DEVLOG.md
+.serena/
+docs/
+

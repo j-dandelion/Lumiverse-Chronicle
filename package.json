@@ -1,0 +1,20 @@
+{
+  "name": "chronicle-ext",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bun build src/main.tsx --outfile dist/frontend.js --target browser --format esm && bun build src/worker.ts --outfile dist/worker.js --target bun --format esm",
+    "build:frontend": "bun build src/main.tsx --outfile dist/frontend.js --target browser --format esm",
+    "build:worker": "bun build src/worker.ts --outfile dist/worker.js --target bun --format esm",
+    "deploy": "bash build.sh",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "lumiverse-spindle-types": "file:/home/jared/Lumiverse/node_modules/lumiverse-spindle-types",
+    "preact": "^10.29.0"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "version": "1.0.0",
+  "name": "Chronicle",
+  "identifier": "chronicle",
+  "author": "Creature",
+  "github": "https://github.com/j-dandelion/Lumiverse-Chronicle",
+  "homepage": "",
+  "description": "Summarize messages and save them as lorebook entries in Lumiverse.",
+  "permissions": ["generation", "chat_mutation", "world_books", "chats", "characters", "personas"],
+  "entry_frontend": "dist/frontend.js",
+  "entry_backend": "dist/worker.js",
+  "minimum_lumiverse_version": "0.9.0"
+}
