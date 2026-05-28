@@ -1,17 +1,16 @@
 ## 📖 Chronicle
 
-Similar to the MemoryBooks extension for SillyTavern, this extension provides a quick and easy way to take a scene or arc and create a customizable summary or memory (saved as a lorebook entry).
+Similar to the MemoryBooks extension for SillyTavern, this extension provides a quick and easy way to take a scene/arc and create a customizable summary or memory (saved as a lorebook entry).
 
-And not just summaries/memories: technically, you can feed a set of messages into context for any kind of prompt you want. So it can be useful for all sorts of memory and context management techniques.
+Technically, you can feed a set of messages into context for any kind of prompt you want. It can be useful for all sorts of memory and context management techniques.
 
-## What it adds
+## What it adds, how to use
 
-There's a **Select messages** button built into Lumiverse at the top-right of chat. It opens a message selection bar.
+There's a **Select messages** button built into Lumiverse at the top-right of chat. It opens a message selection bar. 
 
-Chronicle adds a button to that bar:
-- **Summarize button** (Opens a pop-up menu with settings/presets and a button to generate summary preview)
+On PC, you can use Shift + Click to select a set of messages. On mobile, the behavior is default, just tap two messages and it selects everything between.
 
-Everything else is inside that menu.
+Chronicle adds a **Summarize button** to the message selection bar and works with selected messages. It opens a pop-up menu with settings/presets and a button to start generating. Everything else is inside that menu.
 
 ## Features included so far
 
@@ -29,10 +28,9 @@ Everything else is inside that menu.
 
 ## Screenshots
 
-<p align="center">
-  <img width="800" alt="Summarize modal with message selection"
-src="https://github.com/user-attachments/assets/3efde716-e072-4728-918c-990ab5661d5c" />
-</p>
+<div align="center">
+  <img width="800" height="199" alt="Summarize modal with message selection" src="https://github.com/user-attachments/assets/b6478e1b-7c1f-4f17-9501-d7fe20ef0bfc" />
+</div>
 
 <br/>
 
@@ -54,6 +52,6 @@ src="https://github.com/user-attachments/assets/5db61426-496a-4962-8705-cf03c99e
 
 > 🧠 You can use it standalone or alongside the default Lumiverse Summarize, Memory Cortex, and other extensions like Lore Recall. They all do different things and can harmonize pretty well with the right setup.
 
-> ⚠️ Vibecoded with high-end models, a custom harness, and a careful workflow. But still, obviously not ideal, you know how it goes. If someone develops something better, I'll happily defer to them.
+> ⚠️ Vibecoded with high-end models, a custom harness, and a careful workflow. But still, this is amateur hour, you know how it goes. If someone develops something better, I'll happily defer to them.
 
 > 🛠️ Any reported bugs should be fixed within a day or two. Requests, suggestions, and criticism are welcome.
