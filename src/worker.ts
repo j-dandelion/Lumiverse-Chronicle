@@ -851,10 +851,15 @@ async function autoGenerateChronicleBook(userId: string): Promise<{ id: string }
     const nextN = chronicleNumbers.length > 0 ? chronicleNumbers[chronicleNumbers.length - 1] + 1 : 1
     const bookName = `Chronicle_${nextN}`
 
-    const newBook = await spindle.world_books.create(
-      { name: bookName, description: `Auto-generated Chronicle lorebook #${nextN}` },
-      userId
-    ) as WorldBookDTO
+    const newBook = await Promise.race([
+      spindle.world_books.create(
+        { name: bookName, description: `Auto-generated Chronicle lorebook #${nextN}` },
+        userId
+      ) as Promise<WorldBookDTO>,
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Timed out creating lorebook')), 10_000)
+      ),
+    ])
 
     spindle.log.info(`${LOG} Auto-generated Chronicle book: ${bookName} (${newBook.id})`)
     return { id: newBook.id }

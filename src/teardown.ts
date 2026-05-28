@@ -8,6 +8,7 @@ interface TeardownState {
   _removeStyles: (() => void) | null
   _selectBarCleanup: { cleanup: () => void } | null
   _backendUnsub: (() => void) | null
+  _moduleBackendUnsub: (() => void) | null
   _renders: Array<{ root: Element; unmount: () => void }>
   _teardownRef: { current: (() => void) | null }
 }
@@ -25,6 +26,9 @@ export function createFullTeardown(state: TeardownState): () => void {
 
     state._backendUnsub?.()
     state._backendUnsub = null
+
+    state._moduleBackendUnsub?.()
+    state._moduleBackendUnsub = null
 
     // Unmount all tracked Preact components (reverse order)
     for (const r of [...state._renders].reverse()) {

@@ -299,7 +299,7 @@ export function setup(spindleCtx: SpindleFrontendContext) {
   // Runs regardless of modal state — catches results when modal was
   // dismissed during generation. The in-modal SummarizeFlow listener
   // (via chronicle:backend-message CustomEvent) handles in-modal events.
-  spindleCtx.onBackendMessage((payload: unknown) => {
+  const _moduleBackendUnsub = spindleCtx.onBackendMessage((payload: unknown) => {
     const msg = payload as Record<string, unknown> | null
     if (!msg || typeof msg.type !== 'string') return
 
@@ -332,6 +332,7 @@ export function setup(spindleCtx: SpindleFrontendContext) {
     _removeStyles: _removeStyles as (() => void) | null,
     _selectBarCleanup: _selectBarCleanup as { cleanup: () => void } | null,
     _backendUnsub: _backendUnsub as (() => void) | null,
+    _moduleBackendUnsub: _moduleBackendUnsub as (() => void) | null,
     _renders,
     _teardownRef: { current: null as (() => void) | null },
   }

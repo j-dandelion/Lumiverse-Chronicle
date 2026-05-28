@@ -862,7 +862,10 @@ async function autoGenerateChronicleBook(userId) {
     const chronicleNumbers = allBooks.map((b) => b.name.match(/^Chronicle_(\d+)$/)).filter((m) => m !== null).map((m) => parseInt(m[1], 10)).sort((a, b) => a - b);
     const nextN = chronicleNumbers.length > 0 ? chronicleNumbers[chronicleNumbers.length - 1] + 1 : 1;
     const bookName = `Chronicle_${nextN}`;
-    const newBook = await spindle.world_books.create({ name: bookName, description: `Auto-generated Chronicle lorebook #${nextN}` }, userId);
+    const newBook = await Promise.race([
+      spindle.world_books.create({ name: bookName, description: `Auto-generated Chronicle lorebook #${nextN}` }, userId),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("Timed out creating lorebook")), 1e4))
+    ]);
     spindle.log.info(`${LOG} Auto-generated Chronicle book: ${bookName} (${newBook.id})`);
     return { id: newBook.id };
   })();

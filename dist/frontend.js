@@ -515,55 +515,6 @@ function getChronicleCSS() {
       --chronicle-overlay-bg: rgba(0, 0, 0, 0.5);
     }
 
-    /* ── Range Selector ─────────────────────────────────── */
-    [data-chronicle="range-selector"] {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .chronicle-range-btn {
-      background: var(--lumiverse-fill-subtle);
-      border: 1px solid var(--lumiverse-primary-050);
-      color: var(--lumiverse-text);
-      font-size: calc(11px * var(--lumiverse-font-scale, 1));
-      padding: 4px 10px;
-      border-radius: 6px;
-      cursor: pointer;
-      transition: background var(--lumiverse-transition-fast), border-color var(--lumiverse-transition-fast);
-    }
-    .chronicle-range-btn:hover {
-      background: var(--lumiverse-primary-015);
-    }
-    .chronicle-range-btn:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-    }
-
-    /* ── Range-pick mode overlay ───────────────────────── */
-    [data-chronicle-range-pick] [data-message-id] {
-      cursor: crosshair;
-    }
-    /* Hover outline on card element only — not the virtual row wrapper
-       which has padding-bottom: 8px. Must scope to the exact card
-       data-component values (BubbleMessage, MinimalMessage) — bare
-       [data-component] matches every element with that attribute page-wide. */
-    [data-chronicle-range-pick] [data-component="BubbleMessage"]:hover,
-    [data-chronicle-range-pick] [data-component="MinimalMessage"]:hover {
-      outline: 2px dashed var(--lumiverse-primary);
-      outline-offset: -2px;
-    }
-
-    /* ── Chronicle fallback selection highlight ─────────── */
-    /* Scoped to specific card data-component values to avoid wrapping
-       virtual row padding. The class may also be on the virtual row
-       (from getMessageElements() returning both), but won't render a visible outline. */
-    [data-component="BubbleMessage"].chronicle-selected,
-    [data-component="MinimalMessage"].chronicle-selected {
-      outline: 2px solid var(--lumiverse-primary) !important;
-      outline-offset: -2px;
-    }
-
     /* ── Summarize Button ─────────────────────────────────── */
     [data-chronicle="summarize-btn"] {
       display: flex;
@@ -1567,176 +1518,6 @@ function u3(e3, t3, n2, o3, i3, u4) {
   return l.vnode && l.vnode(l3), l3;
 }
 
-// src/components/RangeSelector.tsx
-function isNarrow() {
-  return typeof window !== "undefined" && window.innerWidth <= 600;
-}
-function findLumiverseStoreState() {
-  const messageEl = document.querySelector("[data-message-id]");
-  if (!messageEl) {
-    console.warn("[Chronicle] No [data-message-id] element found — cannot access store");
-    return null;
-  }
-  const fiberKey = Object.keys(messageEl).find((k3) => k3.startsWith("__reactFiber$") || k3.startsWith("__reactInternalInstance$"));
-  if (!fiberKey) {
-    console.warn("[Chronicle] No React fiber found on message element — store access unavailable");
-    return null;
-  }
-  let fiber = messageEl[fiberKey];
-  while (fiber) {
-    let hook = fiber.memoizedState;
-    while (hook) {
-      const state = hook.memoizedState;
-      if (state && typeof state === "object" && state !== null) {
-        if (typeof state.messageSelectMode !== "undefined") {
-          return state;
-        }
-      }
-      hook = hook.next;
-    }
-    fiber = fiber.return;
-  }
-  console.warn("[Chronicle] Store state not found after walking full fiber tree");
-  return null;
-}
-function ensureSelectModeActive() {
-  const storeState = findLumiverseStoreState();
-  if (!storeState)
-    return false;
-  const actions = storeState;
-  if (!actions.messageSelectMode && typeof actions.setMessageSelectMode === "function") {
-    actions.setMessageSelectMode(true);
-  }
-  return true;
-}
-function selectRangeViaStore(firstId, secondId) {
-  const storeState = findLumiverseStoreState();
-  if (!storeState)
-    return false;
-  const actions = storeState;
-  if (typeof actions.selectMessageRange !== "function")
-    return false;
-  actions.selectMessageRange(firstId, secondId);
-  return true;
-}
-function resolveCardEl(target) {
-  if (target.matches('[data-component="BubbleMessage"], [data-component="MinimalMessage"]')) {
-    return target;
-  }
-  const inner = target.querySelector('[data-component="BubbleMessage"], [data-component="MinimalMessage"]');
-  if (inner)
-    return inner;
-  const closest = target.closest('[data-component="BubbleMessage"], [data-component="MinimalMessage"]');
-  return closest;
-}
-var RangeSelector = () => {
-  const [mode, setMode] = d2("idle");
-  const [error, setError] = d2(null);
-  const pendingFirstIdRef = A2(null);
-  const modeRef = A2("idle");
-  const errorTimeoutRef = A2(null);
-  y2(() => {
-    modeRef.current = mode;
-  }, [mode]);
-  const enterRangeMode = q2(() => {
-    const ok = ensureSelectModeActive();
-    if (!ok) {
-      setError("Could not activate select mode");
-      if (errorTimeoutRef.current)
-        clearTimeout(errorTimeoutRef.current);
-      errorTimeoutRef.current = setTimeout(() => setError(null), 3000);
-      return;
-    }
-    setMode("clickRange");
-    setError(null);
-  }, []);
-  const exitRangeMode = q2(() => {
-    setMode("idle");
-    pendingFirstIdRef.current = null;
-    document.body.removeAttribute("data-chronicle-range-pick");
-  }, []);
-  y2(() => {
-    if (mode !== "clickRange") {
-      document.body.removeAttribute("data-chronicle-range-pick");
-      return;
-    }
-    document.body.setAttribute("data-chronicle-range-pick", "");
-    const handler = (e3) => {
-      if (e3.shiftKey)
-        return;
-      const target = e3.target.closest("[data-message-id]");
-      if (!target)
-        return;
-      const cardEl = resolveCardEl(target);
-      if (!cardEl)
-        return;
-      const messageId = cardEl.getAttribute("data-message-id");
-      if (!messageId)
-        return;
-      if (pendingFirstIdRef.current === null) {
-        pendingFirstIdRef.current = messageId;
-      } else {
-        const firstId = pendingFirstIdRef.current;
-        pendingFirstIdRef.current = null;
-        const ok = selectRangeViaStore(firstId, messageId);
-        if (!ok) {
-          setError("Store access failed — try Shift+Click");
-          if (errorTimeoutRef.current)
-            clearTimeout(errorTimeoutRef.current);
-          errorTimeoutRef.current = setTimeout(() => setError(null), 3000);
-        }
-        setMode("idle");
-        document.body.removeAttribute("data-chronicle-range-pick");
-      }
-    };
-    document.body.addEventListener("click", handler);
-    return () => {
-      document.body.removeEventListener("click", handler);
-    };
-  }, [mode]);
-  y2(() => {
-    if (mode !== "clickRange")
-      return;
-    const checkInterval = setInterval(() => {
-      const storeState = findLumiverseStoreState();
-      if (storeState && !storeState.messageSelectMode) {
-        setMode("idle");
-        pendingFirstIdRef.current = null;
-        document.body.removeAttribute("data-chronicle-range-pick");
-      }
-    }, 500);
-    return () => clearInterval(checkInterval);
-  }, [mode]);
-  const narrow = isNarrow();
-  return /* @__PURE__ */ u3(S, {
-    children: [
-      mode === "idle" && /* @__PURE__ */ u3("button", {
-        class: "chronicle-range-btn",
-        onClick: enterRangeMode,
-        title: "Click two messages to select everything between them",
-        children: "Select Range"
-      }, undefined, false, undefined, this),
-      mode === "clickRange" && /* @__PURE__ */ u3(S, {
-        children: [
-          /* @__PURE__ */ u3("button", {
-            class: "chronicle-range-btn",
-            onClick: exitRangeMode,
-            children: "Cancel"
-          }, undefined, false, undefined, this),
-          /* @__PURE__ */ u3("span", {
-            style: { fontSize: "calc(11px * var(--lumiverse-font-scale, 1))", color: "var(--lumiverse-text-dim)" },
-            children: pendingFirstIdRef.current === null ? narrow ? "Tap first message…" : "Click first message…" : narrow ? "Now tap the last message…" : "Now click the last message…"
-          }, undefined, false, undefined, this)
-        ]
-      }, undefined, true, undefined, this),
-      error && /* @__PURE__ */ u3("span", {
-        style: { fontSize: "calc(11px * var(--lumiverse-font-scale, 1))", color: "rgb(252, 165, 165)" },
-        children: error
-      }, undefined, false, undefined, this)
-    ]
-  }, undefined, true, undefined, this);
-};
-
 // src/components/SummarizeButton.tsx
 var SummarizeButton = ({ selectedCount: _initialCount }) => {
   const [selectedCount, setSelectedCount] = d2(_initialCount);
@@ -1893,27 +1674,6 @@ function injectIntoSelectBar() {
     return null;
   }
   const cancelBtn = Array.from(actions.querySelectorAll("button")).find((b2) => b2.textContent?.trim() === "Cancel" && !b2.closest("[data-chronicle]"));
-  let rangeCleanup = null;
-  if (!actions.querySelector('[data-chronicle="range-selector"]')) {
-    const rangeMount = document.createElement("span");
-    rangeMount.setAttribute("data-chronicle", "range-selector");
-    rangeMount.style.display = "contents";
-    if (cancelBtn) {
-      actions.insertBefore(rangeMount, cancelBtn);
-    } else {
-      actions.appendChild(rangeMount);
-    }
-    R(/* @__PURE__ */ u3(ErrorBoundary, {
-      name: "range",
-      children: /* @__PURE__ */ u3(RangeSelector, {}, undefined, false, undefined, this)
-    }, undefined, false, undefined, this), rangeMount);
-    trackRender(rangeMount, () => unmountComponentAtNode(rangeMount));
-    rangeCleanup = () => {
-      unmountComponentAtNode(rangeMount);
-      rangeMount.remove();
-      untrackRender(rangeMount);
-    };
-  }
   let summaryCleanup = null;
   if (!actions.querySelector('[data-chronicle="summarize-btn"]')) {
     const summaryMount = document.createElement("span");
@@ -1939,7 +1699,6 @@ function injectIntoSelectBar() {
   }
   return {
     cleanup: () => {
-      rangeCleanup?.();
       summaryCleanup?.();
     }
   };
@@ -1976,14 +1735,14 @@ function createFullTeardown(state) {
     state._selectBarCleanup = null;
     state._backendUnsub?.();
     state._backendUnsub = null;
+    state._moduleBackendUnsub?.();
+    state._moduleBackendUnsub = null;
     for (const r3 of [...state._renders].reverse()) {
       try {
         r3.unmount();
       } catch {}
     }
     state._renders.length = 0;
-    document.body.removeAttribute("data-chronicle-range-pick");
-    document.querySelectorAll(".chronicle-selected").forEach((el) => el.classList.remove("chronicle-selected"));
     state._teardownRef.current = null;
   };
 }
@@ -5188,9 +4947,8 @@ function setup(spindleCtx) {
   }
   function onSelectModeActivate() {
     console.log("[Chronicle] Select mode activated");
-    const existingRange = document.querySelector('[data-chronicle="range-selector"]');
     const existingSummary = document.querySelector('[data-chronicle="summarize-btn"]');
-    if (existingRange && existingSummary) {
+    if (existingSummary) {
       return;
     }
     _selectBarCleanup?.cleanup();
@@ -5200,14 +4958,10 @@ function setup(spindleCtx) {
     console.log("[Chronicle] Select mode deactivated");
     _selectBarCleanup?.cleanup();
     _selectBarCleanup = null;
-    document.body.removeAttribute("data-chronicle-range-pick");
-    document.querySelectorAll(".chronicle-selected").forEach((el) => {
-      el.classList.remove("chronicle-selected");
-    });
   }
   _removeStyles = injectStyles();
   _backendUnsub = setupBackendListener(spindleCtx);
-  spindleCtx.onBackendMessage((payload) => {
+  const _moduleBackendUnsub = spindleCtx.onBackendMessage((payload) => {
     const msg = payload;
     if (!msg || typeof msg.type !== "string")
       return;
@@ -5236,6 +4990,7 @@ function setup(spindleCtx) {
     _removeStyles,
     _selectBarCleanup,
     _backendUnsub,
+    _moduleBackendUnsub,
     _renders,
     _teardownRef: { current: null }
   };
@@ -5252,8 +5007,6 @@ function teardown() {
     return;
   }
   document.querySelectorAll("[data-chronicle]").forEach((el) => el.remove());
-  document.body.removeAttribute("data-chronicle-range-pick");
-  document.querySelectorAll(".chronicle-selected").forEach((el) => el.classList.remove("chronicle-selected"));
 }
 export {
   teardown,
