@@ -1,16 +1,26 @@
 ## 📖 Chronicle
 
-Similar to the MemoryBooks extension for SillyTavern, this extension provides a quick and easy way to take a scene/arc and create a customizable summary or memory (saved as a lorebook entry).
+Similar to the MemoryBooks extension for SillyTavern, this extension provides a quick and easy way to turn selected messages into a customizable summary or memory. The results can then be saved as a lorebook entry.
 
-Technically, you can feed a set of messages into context for any kind of prompt you want. It can be useful for all sorts of memory and context management techniques.
+Since you can use lorebooks lots of different ways, Chronicle is useful for all sorts of memory and context management techniques. 
 
-## What it adds, how to use
+## What sets it apart
 
-There's a **Select messages** button built into Lumiverse at the top-right of chat. It opens a message selection bar. 
+> ⚙️ It's lightweight. It doesn't try to be an all-in-one suite or automate a bunch of stuff for you. It's just one small handy tool to pick up and use when you see fit.
 
-On PC, you can use Shift + Click to select a set of messages. On mobile, the behavior is default, just tap two messages and it selects everything between.
+> 📕 Lumiverse's prompt preset and lorebook systems already give you all the UI and tools you need to choose *when*, *where*, and *how* your summaries/memories are shown to the LLM. Chronicle just helps you generate them from chat data and structure them the way you like.
 
-Chronicle adds a **Summarize button** to the message selection bar and works with selected messages. It opens a pop-up menu with settings/presets and a button to start generating. Everything else is inside that menu.
+> 🧠 It can be used standalone or alongside the default Lumiverse Summarize, Memory Cortex, and extensions like Lore Recall. They all do different things, and can harmonize pretty well with the right setup.
+
+## How to use
+
+There's a **Select Messages** button built into Lumiverse at the top-right of chat. It opens a message selection bar. 
+
+On PC, you can use shift + click to select a set of messages. On mobile, that behavior is active by default: just tap two messages and it selects everything between.
+
+Chronicle adds a **Summarize** button to the message selection bar and works with selected messages. It opens a pop-up menu with settings/presets and a button to start generating. 
+
+Everything else is inside that menu!
 
 ## Features included so far
 
@@ -48,10 +58,6 @@ src="https://github.com/user-attachments/assets/5db61426-496a-4962-8705-cf03c99e
 
 ## FYI
 
-> 📕 Like all lorebook entries, your summaries/memories can be always-active (constant), triggered by keywords, or vectorized.
+> ⚠️ Vibecoded with high-end models, a custom harness, and a careful workflow. But still, this is amateur hour 😅 You know how it goes.
 
-> 🧠 You can use it standalone or alongside the default Lumiverse Summarize, Memory Cortex, and other extensions like Lore Recall. They all do different things and can harmonize pretty well with the right setup.
-
-> ⚠️ Vibecoded with high-end models, a custom harness, and a careful workflow. But still, this is amateur hour, you know how it goes. If someone develops something better, I'll happily defer to them.
-
-> 🛠️ Any reported bugs should be fixed within a day or two. Requests, suggestions, and criticism are welcome.
+> 🛠️ Any reported bugs should be fixed within a day or two. Requests, suggestions, and criticism are very much welcome.
