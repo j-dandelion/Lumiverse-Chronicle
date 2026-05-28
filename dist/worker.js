@@ -842,9 +842,11 @@ async function getOrCreateChronicleBook(userId) {
     return { id: newBook.id };
   })();
   _creationLocks.set(key, promise);
+  const safetyTimeout = setTimeout(() => _creationLocks.delete(key), 30000);
   try {
     return await promise;
   } finally {
+    clearTimeout(safetyTimeout);
     _creationLocks.delete(key);
   }
 }
@@ -870,9 +872,11 @@ async function autoGenerateChronicleBook(userId) {
     return { id: newBook.id };
   })();
   _creationLocks.set(key, promise);
+  const safetyTimeout = setTimeout(() => _creationLocks.delete(key), 30000);
   try {
     return await promise;
   } finally {
+    clearTimeout(safetyTimeout);
     _creationLocks.delete(key);
   }
 }

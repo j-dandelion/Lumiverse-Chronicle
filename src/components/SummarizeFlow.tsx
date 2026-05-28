@@ -689,13 +689,15 @@ export const SummarizeFlow: FunctionComponent<Props> = (props) => {
       {flowState === 'error' && errorMessage && (
         <div class="chronicle-sf-error">
           <span>{errorMessage}</span>
-          <button
-            class="chronicle-sf-btn"
-            onClick={handleErrorRetry}
-            style={{ flex: '0 0 auto', marginLeft: 8 }}
-          >
-            Retry
-          </button>
+          {((errorStage !== 'saving') || errorRetryable) && (
+            <button
+              class="chronicle-sf-btn"
+              onClick={handleErrorRetry}
+              style={{ flex: '0 0 auto', marginLeft: 8 }}
+            >
+              Retry
+            </button>
+          )}
         </div>
       )}
     </div>

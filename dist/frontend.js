@@ -4701,7 +4701,7 @@ var SummarizeFlow = (props) => {
           /* @__PURE__ */ u3("span", {
             children: errorMessage
           }, undefined, false, undefined, this),
-          /* @__PURE__ */ u3("button", {
+          (errorStage !== "saving" || errorRetryable) && /* @__PURE__ */ u3("button", {
             class: "chronicle-sf-btn",
             onClick: handleErrorRetry,
             style: { flex: "0 0 auto", marginLeft: 8 },

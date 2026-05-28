@@ -813,9 +813,13 @@ async function getOrCreateChronicleBook(userId: string): Promise<{ id: string }>
 
   _creationLocks.set(key, promise)
 
+  // Safety timeout — auto-release lock after 30s if the finally block doesn't run
+  const safetyTimeout = setTimeout(() => _creationLocks.delete(key), 30_000)
+
   try {
     return await promise
   } finally {
+    clearTimeout(safetyTimeout)
     _creationLocks.delete(key)
   }
 }
@@ -867,9 +871,13 @@ async function autoGenerateChronicleBook(userId: string): Promise<{ id: string }
 
   _creationLocks.set(key, promise)
 
+  // Safety timeout — auto-release lock after 30s if the finally block doesn't run
+  const safetyTimeout = setTimeout(() => _creationLocks.delete(key), 30_000)
+
   try {
     return await promise
   } finally {
+    clearTimeout(safetyTimeout)
     _creationLocks.delete(key)
   }
 }
