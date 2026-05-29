@@ -11,7 +11,7 @@
     "check": "tsc --noEmit"
   },
   "dependencies": {
-    "lumiverse-spindle-types": "file:/home/jared/Lumiverse/node_modules/lumiverse-spindle-types",
+    "lumiverse-spindle-types": "latest",
     "preact": "^10.29.0"
   },
   "devDependencies": {
