@@ -28,11 +28,15 @@ import type {
 } from './types'
 
 import {
-  _summarizingUsers,
-  _summarizingTimeouts,
-  _pendingSummaries,
   SUMMARIZE_TIMEOUT_MS,
   type PendingSummary,
+  isSummarizing,
+  startSummarizing,
+  stopSummarizing,
+  setSummarizeTimeout,
+  getPendingSummary,
+  setPendingSummary,
+  deletePendingSummary,
 } from './worker-state'
 
 import {
@@ -227,7 +231,7 @@ async function handleSummarizeV2(req: SummarizeRequestV2, userId: string): Promi
   if (req.previewOnly) {
     const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
 
-    _pendingSummaries.set(requestId, {
+    setPendingSummary(requestId, {
       requestId,
       title: summary.title,
       content: summary.content,
@@ -255,7 +259,7 @@ async function handleSummarizeV2(req: SummarizeRequestV2, userId: string): Promi
 }
 
 async function handleSaveSummary(req: SaveSummaryRequest, userId: string): Promise<void> {
-  const pending = _pendingSummaries.get(req.requestId)
+  const pending = getPendingSummary(req.requestId)
   if (!pending) {
     spindle.sendToFrontend({
       type: 'summarize_failed',
@@ -304,7 +308,7 @@ async function handleSaveSummary(req: SaveSummaryRequest, userId: string): Promi
     const { entryId, worldBookId } = saveResult
 
     // Only delete pending summary AFTER save succeeds — preserve it on failure for retry
-    _pendingSummaries.delete(req.requestId)
+    deletePendingSummary(req.requestId)
 
     // Hide prior messages on successful save (fire-and-forget)
     if (pending.autoHidePrior) {
@@ -345,9 +349,9 @@ async function handleSaveSummary(req: SaveSummaryRequest, userId: string): Promi
 }
 
 async function handleDiscardSummary(req: DiscardSummaryRequest, userId: string): Promise<void> {
-  const pending = _pendingSummaries.get(req.requestId)
+  const pending = getPendingSummary(req.requestId)
   if (pending && pending.userId === userId) {
-    _pendingSummaries.delete(req.requestId)
+    deletePendingSummary(req.requestId)
     spindle.log.info(`${LOG} User ${userId} discarded pending summary ${req.requestId}`)
   }
   // Send confirmation so frontend can clean up confidently
@@ -472,7 +476,7 @@ async function handleFrontendMessage(
   }
 
   if (isValidSummarizeRequestV2(payload)) {
-    if (_summarizingUsers.has(userId)) {
+    if (isSummarizing(userId)) {
       spindle.sendToFrontend({
         type: 'summarize_failed',
         error: 'A summarization is already in progress for your account. Please wait.',
@@ -482,13 +486,12 @@ async function handleFrontendMessage(
       return
     }
 
-    _summarizingUsers.add(userId)
+    startSummarizing(userId)
     let _summarizationCompleted = false
     const timeoutId = setTimeout(() => {
       // Skip if the task already completed or errored (which sends its own message)
       if (_summarizationCompleted) return
-      _summarizingUsers.delete(userId)
-      _summarizingTimeouts.delete(userId)
+      stopSummarizing(userId)
       spindle.log.warn(`${LOG} Summarization lock for ${userId} auto-cleared after ${SUMMARIZE_TIMEOUT_MS / 1000}s timeout`)
       spindle.sendToFrontend({
         type: 'summarize_failed',
@@ -497,15 +500,13 @@ async function handleFrontendMessage(
         retryable: true,
       }, userId)
     }, SUMMARIZE_TIMEOUT_MS)
-    _summarizingTimeouts.set(userId, timeoutId)
+    setSummarizeTimeout(userId, timeoutId)
 
     try {
       await handleSummarizeV2(payload, userId)
     } finally {
       _summarizationCompleted = true
-      const t = _summarizingTimeouts.get(userId)
-      if (t) { clearTimeout(t); _summarizingTimeouts.delete(userId) }
-      _summarizingUsers.delete(userId)
+      stopSummarizing(userId)
     }
 
   } else if (isValidSaveSummaryRequest(payload)) {

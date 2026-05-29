@@ -7,8 +7,8 @@ declare const spindle: import('lumiverse-spindle-types').SpindleAPI
 
 export const SUMMARIZE_TIMEOUT_MS = 5 * 60 * 1000 // 5 minutes — prevents deadlock if worker hangs
 
-export const _summarizingUsers = new Set<string>()
-export const _summarizingTimeouts = new Map<string, ReturnType<typeof setTimeout>>()
+const _summarizingUsers = new Set<string>()
+const _summarizingTimeouts = new Map<string, ReturnType<typeof setTimeout>>()
 
 export interface PendingSummary {
   requestId: string
@@ -25,8 +25,43 @@ export interface PendingSummary {
   sceneNumber?: string        // scene number used in the LLM prompt (prevent save-time divergence)
 }
 
-export const _pendingSummaries = new Map<string, PendingSummary>()
+const _pendingSummaries = new Map<string, PendingSummary>()
 const PENDING_TTL = 30 * 60 * 1000 // 30 minutes
+
+// ── Operations ──────────────────────────────────────────────
+
+export function isSummarizing(userId: string): boolean {
+  return _summarizingUsers.has(userId)
+}
+
+export function startSummarizing(userId: string): void {
+  _summarizingUsers.add(userId)
+}
+
+export function stopSummarizing(userId: string): void {
+  _summarizingUsers.delete(userId)
+  const t = _summarizingTimeouts.get(userId)
+  if (t) {
+    clearTimeout(t)
+    _summarizingTimeouts.delete(userId)
+  }
+}
+
+export function setSummarizeTimeout(userId: string, timeoutId: ReturnType<typeof setTimeout>): void {
+  _summarizingTimeouts.set(userId, timeoutId)
+}
+
+export function getPendingSummary(requestId: string): PendingSummary | undefined {
+  return _pendingSummaries.get(requestId)
+}
+
+export function setPendingSummary(requestId: string, pending: PendingSummary): void {
+  _pendingSummaries.set(requestId, pending)
+}
+
+export function deletePendingSummary(requestId: string): void {
+  _pendingSummaries.delete(requestId)
+}
 
 // Periodic cleanup of expired pending summaries
 setInterval(() => {
