@@ -279,19 +279,6 @@ export const PromptManager: FunctionComponent<Props> = ({
     fileInputRef.current?.click()
   }, [])
 
-  // ── Logging for params-switching diagnostics ──
-  const prevPresetRef = useRef<string | null>(null)
-  useEffect(() => {
-    const prev = prevPresetRef.current
-    if (prev !== null && prev !== selectedPresetId) {
-      const p = getPreset(selectedPresetId)
-      console.log('[Chronicle-prompts] preset switch:',
-        prev, '→', selectedPresetId,
-        '| params from preset:', p?.params ? JSON.stringify(p.params) : 'none (will use DEFAULT)',
-        '| current params state:', JSON.stringify(params))
-    }
-    prevPresetRef.current = selectedPresetId
-  })
 
   return (
     <div data-chronicle="prompt-manager">
