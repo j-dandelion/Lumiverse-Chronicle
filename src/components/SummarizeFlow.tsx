@@ -12,9 +12,11 @@ import { ConnectionManager } from './ConnectionManager'
 import { LorebookManager } from './LorebookManager'
 import { DEFAULT_SETTINGS, settingsToCreateInput, type EntrySettings } from '../settings'
 import { getSelectedMessageIds } from '../select-mode'
+import { usePersistedState } from '../hooks'
 import { PROTOCOL_VERSION } from '../types'
 import type { GenerationParams } from '../types'
 import { DEFAULT_PARAMS } from '../presets'
+import { openConnectionsDrawer } from '../connections-nav'
 
 type FlowState = 'idle' | 'summarizing' | 'preview' | 'saving' | 'error' | 'save_timeout'
 
@@ -101,37 +103,31 @@ export const SummarizeFlow: FunctionComponent<Props> = (props) => {
     lorebookIdProp ?? undefined
   )
   // Auto-hide settings (persisted to localStorage)
-  const [autoHidePrior, setAutoHidePrior] = useState<boolean>(() => {
-    try { return localStorage.getItem('chronicle:autoHidePrior') === 'true' } catch { return true }
-  })
-  const [keepVisibleCount, setKeepVisibleCount] = useState<number>(() => {
-    try {
-      const v = localStorage.getItem('chronicle:keepVisibleCount')
-      return v ? Math.max(0, parseInt(v, 10) || 0) : 10
-    } catch { return 10 }
-  })
+  const [autoHidePrior, setAutoHidePrior] = usePersistedState<boolean>(
+    'chronicle:autoHidePrior', true, String, v => v === 'true'
+  )
+  const [keepVisibleCount, setKeepVisibleCount] = usePersistedState<number>(
+    'chronicle:keepVisibleCount', 10, String, v => Math.max(0, parseInt(v, 10) || 0)
+  )
   // Recent context settings (persisted)
-  const [includeRecentContext, setIncludeRecentContext] = useState<boolean>(() => {
-    try { return localStorage.getItem('chronicle:includeRecentContext') === 'true' } catch { return false }
-  })
-  const [recentContextCount, setRecentContextCount] = useState<number>(() => {
-    try {
-      const v = localStorage.getItem('chronicle:recentContextCount')
-      return v ? Math.max(1, Math.min(10, parseInt(v, 10) || 3)) : 3
-    } catch { return 3 }
-  })
+  const [includeRecentContext, setIncludeRecentContext] = usePersistedState<boolean>(
+    'chronicle:includeRecentContext', false, String, v => v === 'true'
+  )
+  const [recentContextCount, setRecentContextCount] = usePersistedState<number>(
+    'chronicle:recentContextCount', 3, String, v => Math.max(1, Math.min(10, parseInt(v, 10) || 3))
+  )
   const [generationParams, setGenerationParams] = useState<GenerationParams>(
     initialGenerationParams ? { ...initialGenerationParams } : { ...DEFAULT_PARAMS }
   )
   // Title format template (persisted)
   const DEFAULT_TITLE_FORMAT = '{number} - {title}'
-  const [titleFormat, setTitleFormat] = useState(() => {
-    try { return localStorage.getItem('chronicle:titleFormat') || DEFAULT_TITLE_FORMAT } catch { return DEFAULT_TITLE_FORMAT }
-  })
+  const [titleFormat, setTitleFormat] = usePersistedState(
+    'chronicle:titleFormat', DEFAULT_TITLE_FORMAT
+  )
   // Whether the user is in custom format mode (persisted boolean — NOT derived from value matching)
-  const [useCustomFormat, setUseCustomFormat] = useState(() => {
-    try { return localStorage.getItem('chronicle:useCustomTitleFormat') === 'true' } catch { return false }
-  })
+  const [useCustomFormat, setUseCustomFormat] = usePersistedState<boolean>(
+    'chronicle:useCustomTitleFormat', false, String, v => v === 'true'
+  )
   const selectedFormatValue = useCustomFormat ? '__custom__' : titleFormat
   const previewDataRef = useRef<PreviewData | null>(previewProp ?? null)
   const flowStateRef = useRef<FlowState>(previewProp ? 'preview' : 'idle')
@@ -158,20 +154,6 @@ export const SummarizeFlow: FunctionComponent<Props> = (props) => {
       setSummaryKeys(previewProp.keys ?? [])
     }
   }, [previewProp])
-
-  // Persist auto-hide settings to localStorage
-  useEffect(() => {
-    try { localStorage.setItem('chronicle:autoHidePrior', String(autoHidePrior)) } catch {}
-  }, [autoHidePrior])
-
-  useEffect(() => {
-    try { localStorage.setItem('chronicle:keepVisibleCount', String(keepVisibleCount)) } catch {}
-  }, [keepVisibleCount])
-
-  // Persist custom title format mode
-  useEffect(() => {
-    try { localStorage.setItem('chronicle:useCustomTitleFormat', String(useCustomFormat)) } catch {}
-  }, [useCustomFormat])
 
   // Cleanup on unmount: discard any active preview (unless saving)
   useEffect(() => {
@@ -358,98 +340,10 @@ export const SummarizeFlow: FunctionComponent<Props> = (props) => {
     }
   }, [errorStage, previewData, errorRetryable, handleSave, handleCreateSummary, activePrompt])
 
-  // ── Duplicate blink: watches for context menu after More actions click ──
-  const activeObserversRef = useRef<Set<MutationObserver>>(new Set())
-  const moreActionsBlinkedRef = useRef(0)
-
-  const watchForDuplicate = useCallback(() => {
-    const observer = new MutationObserver((mutations) => {
-      // Quick filter: only scan if mutations added any elements
-      const hasAddedNodes = mutations.some(m => m.addedNodes.length > 0)
-      if (!hasAddedNodes && Date.now() - moreActionsBlinkedRef.current < 30_000) return
-      if (Date.now() - moreActionsBlinkedRef.current > 30_000) {
-        observer.disconnect()
-        activeObserversRef.current.delete(observer)
-        return
-      }
-      const items = document.querySelectorAll<HTMLElement>(
-        '[class*="contextMenu"] button, [class*="ContextMenu"] button'
-      )
-      for (const btn of items) {
-        if (btn.textContent?.includes('Duplicate')) {
-          btn.classList.remove('chronicle-conn-highlight')
-          void btn.offsetWidth
-          btn.classList.add('chronicle-conn-highlight')
-          observer.disconnect()
-          activeObserversRef.current.delete(observer)
-          break
-        }
-      }
-    })
-
-    activeObserversRef.current.add(observer)
-    observer.observe(document.body, { childList: true, subtree: true })
-
-    // Safety cleanup after 35s
-    setTimeout(() => {
-      observer.disconnect()
-      activeObserversRef.current.delete(observer)
-    }, 35_000)
-  }, [])
-
-  // Cleanup all observers on unmount
-  useEffect(() => {
-    return () => {
-      for (const obs of activeObserversRef.current) {
-        obs.disconnect()
-      }
-      activeObserversRef.current.clear()
-    }
-  }, [])
-
   // ── handleOpenConnectionsDrawer: close modal, open drawer, blink btn ──
-
   const handleOpenConnectionsDrawer = useCallback(() => {
-    // 1. Close the modal
-    onRequestClose?.()
-
-    // 2. Open the Connections drawer by clicking the sidebar tab button
-    requestAnimationFrame(() => {
-      const connectBtn = document.querySelector<HTMLElement>(
-        'button[title="Connections"]'
-      )
-      if (connectBtn) {
-        connectBtn.click()
-      }
-
-      // 3. After drawer renders, blink the "New Connection" button
-      setTimeout(() => {
-        const allButtons = document.querySelectorAll('button')
-        for (const btn of allButtons) {
-          if (btn.textContent?.includes('New Connection')) {
-            btn.classList.remove('chronicle-conn-highlight')
-            void (btn as HTMLElement).offsetWidth
-            btn.classList.add('chronicle-conn-highlight')
-            break
-          }
-        }
-      }, 300)
-
-      // Blink the first More actions button and watch for Duplicate menu
-      setTimeout(() => {
-        const moreBtns = document.querySelectorAll<HTMLElement>('button[title="More actions"]')
-        if (moreBtns.length > 0) {
-          const moreBtn = moreBtns[0]
-          moreBtn.classList.remove('chronicle-conn-highlight')
-          void moreBtn.offsetWidth
-          moreBtn.classList.add('chronicle-conn-highlight')
-          // Start watching for the Duplicate context menu item
-          moreActionsBlinkedRef.current = Date.now()
-          watchForDuplicate()
-        }
-      }, 800)
-    })
-  }, [onRequestClose, watchForDuplicate])
+    openConnectionsDrawer(onRequestClose)
+  }, [onRequestClose])
 
   if (selectedCount === 0 && flowState === 'idle') {
     return <div class="chronicle-sf-hint">Select messages in a chat to summarize them.</div>
@@ -519,7 +413,6 @@ export const SummarizeFlow: FunctionComponent<Props> = (props) => {
                   onChange={(e) => {
                     const checked = (e.target as HTMLInputElement).checked
                     setIncludeRecentContext(checked)
-                    try { localStorage.setItem('chronicle:includeRecentContext', String(checked)) } catch {}
                   }}
                 />
                 <span style={{ opacity: (!lorebookId || lorebookId === '__auto_generate__') ? 0.5 : 1 }}>
@@ -547,7 +440,6 @@ export const SummarizeFlow: FunctionComponent<Props> = (props) => {
                       // Clamp to range — don't silently reject
                       const clamped = Math.max(1, Math.min(10, v))
                       setRecentContextCount(clamped)
-                      try { localStorage.setItem('chronicle:recentContextCount', String(clamped)) } catch {}
                     }
                   }
                 }}
@@ -602,7 +494,6 @@ export const SummarizeFlow: FunctionComponent<Props> = (props) => {
                   } else {
                     setUseCustomFormat(false)
                     setTitleFormat(val)
-                    try { localStorage.setItem('chronicle:titleFormat', val) } catch {}
                   }
                 }}
               >
@@ -617,7 +508,6 @@ export const SummarizeFlow: FunctionComponent<Props> = (props) => {
                   onInput={(e) => {
                     const val = (e.target as HTMLInputElement).value
                     setTitleFormat(val)
-                    try { localStorage.setItem('chronicle:titleFormat', val) } catch {}
                   }}
                   placeholder={DEFAULT_TITLE_FORMAT}
                 />
