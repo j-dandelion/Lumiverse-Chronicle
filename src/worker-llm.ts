@@ -93,27 +93,25 @@ export async function generateSummary(
   spindle.sendToFrontend({ type: 'summarize_progress', stage: 'generating' }, userId)
 
   try {
-    const genInput: any = {
+    const genInput = {
       type: 'quiet' as const,
       messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
+        { role: 'system' as const, content: systemPrompt },
+        { role: 'user' as const, content: userPrompt },
       ],
       signal: AbortSignal.timeout(120_000), // 2-minute LLM timeout
-    };
-    genInput.userId = userId; // Required for operator-scoped extensions
-    if (connectionId) {
-      genInput.connection_id = connectionId;
+      userId, // Required for operator-scoped extensions
+      ...(connectionId ? { connection_id: connectionId } : {}),
+      ...(params ? {
+        parameters: {
+          temperature: params.temperature,
+          top_p: params.top_p,
+          max_tokens: params.max_tokens,
+          top_k: params.top_k,
+        },
+      } : {}),
     }
-    if (params) {
-      genInput.parameters = {
-        temperature: params.temperature,
-        top_p: params.top_p,
-        max_tokens: params.max_tokens,
-        top_k: params.top_k,
-      }
-    }
-    const result = await spindle.generate.quiet(genInput) as unknown as GenerationResponse
+    const result = await spindle.generate.quiet(genInput as any) as GenerationResponse
 
     const text = result?.content ?? ''
 
