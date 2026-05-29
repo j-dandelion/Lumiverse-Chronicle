@@ -2811,7 +2811,6 @@ var SettingsManager = ({
       setUseCustom(true);
       return;
     }
-    doAutosaveRef.current?.();
     if (autosaveIntervalRef.current !== null) {
       clearInterval(autosaveIntervalRef.current);
       autosaveIntervalRef.current = null;
@@ -2990,8 +2989,10 @@ var SettingsManager = ({
   const update = q2((key, value) => {
     const newSettings = { ...settings, [key]: value };
     onSettingsChange(newSettings);
-    ensureAutosavePreset(newSettings);
-  }, [settings, onSettingsChange, ensureAutosavePreset]);
+    if (useCustom || selectedPreset && !selectedPreset.builtIn) {
+      ensureAutosavePreset(newSettings);
+    }
+  }, [settings, onSettingsChange, ensureAutosavePreset, useCustom, selectedPreset]);
   const toggle = q2((key) => {
     update(key, !settings[key]);
   }, [update, settings]);

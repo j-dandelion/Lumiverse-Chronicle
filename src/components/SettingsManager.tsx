@@ -80,8 +80,7 @@ export const SettingsManager: FunctionComponent<Props> = ({
       setUseCustom(true)
       return
     }
-    // Save current edits before switching away
-    doAutosaveRef.current?.()
+    // Stop autosave — switching presets discards unsaved edits
     if (autosaveIntervalRef.current !== null) {
       clearInterval(autosaveIntervalRef.current)
       autosaveIntervalRef.current = null
@@ -270,8 +269,12 @@ export const SettingsManager: FunctionComponent<Props> = ({
   const update = useCallback(<K extends keyof EntrySettings>(key: K, value: EntrySettings[K]) => {
     const newSettings = { ...settings, [key]: value }
     onSettingsChange(newSettings)
-    ensureAutosavePreset(newSettings)
-  }, [settings, onSettingsChange, ensureAutosavePreset])
+    // Only autosave when editing a custom preset or in custom mode —
+    // built-in presets like "Always Active" should not be overridden.
+    if (useCustom || (selectedPreset && !selectedPreset.builtIn)) {
+      ensureAutosavePreset(newSettings)
+    }
+  }, [settings, onSettingsChange, ensureAutosavePreset, useCustom, selectedPreset])
 
   // Toggle helper
   const toggle = useCallback(<K extends keyof EntrySettings>(key: K) => {
