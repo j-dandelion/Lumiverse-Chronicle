@@ -49,6 +49,7 @@ import {
   saveLorebookEntry,
   type WorldBookDTO,
 } from './worker-worldbooks'
+import { withTimeout } from './timeout'
 
 // ── Hide messages prior to selection ────────────────────────────────
 
@@ -96,12 +97,11 @@ async function hideMessagesPriorTo(
 
     // 5. Bulk hide with timeout guard (Spindle response-hang bug)
     //    setMessagesHidden may not be in published types — cast through any
-    await Promise.race([
+    await withTimeout(
       (spindle.chat as any).setMessagesHidden(chatId, idsToHide, true) as Promise<void>,
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Hide messages request timed out')), 10_000)
-      ),
-    ])
+      10_000,
+      'Hide messages request'
+    )
     spindle.log.info(`${LOG} Hid ${idsToHide.length} messages prior to selection (kept ${keepVisibleCount} visible)`)
   } catch (err: unknown) {
     spindle.log.warn(`${LOG} Failed to hide prior messages: ${err instanceof Error ? err.message : String(err)}`)
@@ -287,7 +287,7 @@ async function handleSaveSummary(req: SaveSummaryRequest, userId: string): Promi
 
     // Race the save against a timeout — the Spindle API response can hang
     // even when the server-side operation succeeds.
-    const saveResult = await Promise.race([
+    const saveResult = await withTimeout(
       saveLorebookEntry(
         { title: effectiveTitle, content: effectiveContent, keys: effectiveKeys },
         pending.chatId,
@@ -298,10 +298,9 @@ async function handleSaveSummary(req: SaveSummaryRequest, userId: string): Promi
         req.titleFormat,
         pending.sceneNumber
       ),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Save request timed out after 15s')), 15_000)
-      ),
-    ])
+      15_000,
+      'Save request'
+    )
     const { entryId, worldBookId } = saveResult
 
     // Only delete pending summary AFTER save succeeds — preserve it on failure for retry
@@ -362,18 +361,17 @@ async function handleDiscardSummary(req: DiscardSummaryRequest, userId: string):
 
 async function handleListConnections(userId: string): Promise<void> {
   try {
-    const connections = await Promise.race([
-      spindle.connections.list(userId) as unknown as Array<{
+    const connections = await withTimeout(
+      Promise.resolve(spindle.connections.list(userId)) as Promise<Array<{
         id: string
         name: string
         provider: string
         api_url: string
         model: string
-      }>,
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Timed out after 10s')), 10_000)
-      ),
-    ])
+      }>>,
+      10_000,
+      'Connections list'
+    )
     spindle.sendToFrontend({ type: 'connections_list', connections }, userId)
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err)
@@ -388,12 +386,11 @@ async function handleListConnections(userId: string): Promise<void> {
 async function handleListLorebooks(userId: string): Promise<void> {
   try {
     // 1. List ALL world books (with timeout — Spindle API can hang)
-    const { data: books } = await Promise.race([
+    const { data: books } = await withTimeout(
       spindle.world_books.list({ limit: 200, userId }) as Promise<{ data: WorldBookDTO[]; total: number }>,
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Lorebook list request timed out after 10s')), 10_000)
-      ),
-    ])
+      10_000,
+      'Lorebook list request'
+    )
     const allBooks = (books as WorldBookDTO[]).map((b) => ({ id: b.id, name: b.name }))
 
     // 2. Try to detect chat-linked lorebook (persona.attached_world_book_id)

@@ -6,6 +6,7 @@
 declare const spindle: import('lumiverse-spindle-types').SpindleAPI
 
 const LOG = '[Chronicle:Worker]'
+import { withTimeout } from './timeout'
 
 // ── Spindle API Return Types ────────────────────────────────────────
 
@@ -45,25 +46,23 @@ async function findOrCreateBook(
   if (existing) return existing
 
   const promise = (async () => {
-    const { data: books } = await Promise.race([
+    const { data: books } = await withTimeout(
       spindle.world_books.list({ limit: 200, userId }) as Promise<{ data: WorldBookDTO[]; total: number }>,
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Timed out listing world books')), 10_000)
-      ),
-    ])
+      10_000,
+      'Listing world books'
+    )
     const allBooks = books as WorldBookDTO[]
     const found = allBooks.find((b) => b.name === matchName)
     if (found) return { id: found.id }
 
-    const newBook = await Promise.race([
+    const newBook = await withTimeout(
       spindle.world_books.create(
         { name: matchName, description },
         userId
       ) as Promise<WorldBookDTO>,
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Timed out creating world book')), 10_000)
-      ),
-    ])
+      10_000,
+      'Creating world book'
+    )
 
     spindle.log.info(`${LOG} Created world book: ${matchName} (${(newBook as WorldBookDTO).id})`)
     return { id: (newBook as WorldBookDTO).id }
@@ -96,12 +95,11 @@ export async function getOrCreateChronicleBook(userId: string): Promise<{ id: st
  */
 export async function autoGenerateChronicleBook(userId: string): Promise<{ id: string }> {
   // Compute the next Chronicle_N name by listing existing books
-  const { data: books } = await Promise.race([
+  const { data: books } = await withTimeout(
     spindle.world_books.list({ limit: 200, userId }) as Promise<{ data: WorldBookDTO[]; total: number }>,
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Auto-generate lorebook list timed out')), 10_000)
-    ),
-  ])
+    10_000,
+    'Auto-generate lorebook list'
+  )
   const allBooks = books as WorldBookDTO[]
 
   const chronicleNumbers = allBooks
