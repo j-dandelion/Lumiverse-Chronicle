@@ -199,12 +199,11 @@ const KEYWORD_STOP_WORDS = new Set([
   'very', 'just', 'than', 'then', 'also', 'more', 'some', 'these', 'those',
   'should', 'because', 'without', 'through', 'against', 'during', 'still',
   'might', 'down', 'back', 'being', 'made', 'much', 'each', 'other',
-  'before', 'after', 'above', 'below', 'upon', 'across', 'along', 'among',
+  'above', 'below', 'upon', 'across', 'along', 'among',
   'around', 'behind', 'beneath', 'beside', 'beyond', 'inside', 'outside',
-  'beneath', 'within', 'without', 'little', 'enough', 'every', 'almost',
+  'within', 'little', 'enough', 'every', 'almost',
   'quite', 'rather', 'already', 'however', 'though', 'either', 'neither',
   'whether', 'whatever', 'whoever', 'whomever', 'whose', 'whom', 'who',
-  'which', 'that', 'these', 'those',
 ])
 
 /**
