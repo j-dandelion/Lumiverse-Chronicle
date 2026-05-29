@@ -2,11 +2,12 @@
  * SettingsManager — View settings preset selector and editor.
  * Mirrors the layout of Lumiverse's WorldBookEntryEditor.
  * Includes preset dropdown, toolbar, and full settings form.
+ * Uses usePresetManager for shared preset CRUD/autosave/export/import logic.
  */
 
-import { useState, useEffect, useCallback, useRef } from 'preact/hooks'
+import { useState, useEffect, useCallback } from 'preact/hooks'
 import type { FunctionComponent } from 'preact'
-import { usePersistedState } from '../hooks'
+import { usePresetManager } from '../usePresetManager'
 import {
   getAllSettingsPresets,
   getSettingsPreset,
@@ -35,232 +36,132 @@ export const SettingsManager: FunctionComponent<Props> = ({
   onSettingsChange,
   loading = false,
 }) => {
-  const [presets, setPresets] = useState<SettingsPreset[]>([])
+  const pm = usePresetManager<SettingsPreset>({
+    selectedKey: 'chronicle_selected_settings_preset',
+    loadAll: getAllSettingsPresets,
+    save: (name) => saveSettingsPreset(name, settings),
+    update: (id, updates) => updateSettingsPreset(id, updates as { settings?: EntrySettings }),
+    findByName: findSettingsPresetByName,
+    deletePreset: deleteSettingsPreset,
+    exportAll: exportSettingsPresets,
+    importAll: importSettingsPresets,
+  })
 
-  const [selectedPresetId, setSelectedPresetId] = usePersistedState<string>(
-    'chronicle_selected_settings_preset', 'default'
-  )
-  const [useCustom, setUseCustom] = useState(false)
-  const [isEditing, setIsEditing] = useState(false)
+  // SettingsManager-specific state
   const [expanded, setExpanded] = useState(false)
-  const [showSaveDialog, setShowSaveDialog] = useState(false)
-  const [saveName, setSaveName] = useState('')
-  const [importError, setImportError] = useState<string | null>(null)
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const autosaveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const doAutosaveRef = useRef<(() => void) | null>(null)  // set after doAutosave is defined
-  const AUTOSAVE_NAME = 'Autosave'
-
-  // Collapsible section states
   const [timingOpen, setTimingOpen] = useState(false)
   const [recursionOpen, setRecursionOpen] = useState(false)
   const [groupOpen, setGroupOpen] = useState(false)
   const [metadataOpen, setMetadataOpen] = useState(false)
 
-  useEffect(() => {
-    setPresets(getAllSettingsPresets())
-  }, [])
-
-  const refreshPresets = useCallback(() => {
-    setPresets(getAllSettingsPresets())
-  }, [])
-
   // Apply a preset's settings
   const applyPreset = useCallback((id: string) => {
     if (id === '__custom__') {
-      setUseCustom(true)
+      pm.setUseCustom(true)
       return
     }
-    // Stop autosave — switching presets discards unsaved edits
-    if (autosaveIntervalRef.current !== null) {
-      clearInterval(autosaveIntervalRef.current)
-      autosaveIntervalRef.current = null
-    }
+    pm.stopAutosaveInterval()
     const preset = getSettingsPreset(id)
     if (preset) {
       onSettingsChange({ ...preset.settings })
-      setSelectedPresetId(id)
-      setUseCustom(false)
-      setIsEditing(false)
+      pm.setSelectedPresetId(id)
+      pm.setUseCustom(false)
+      pm.setIsEditing(false)
     }
-  }, [onSettingsChange])
+  }, [onSettingsChange, pm.stopAutosaveInterval])
 
+  // Override handlePresetChange to load settings
   const handlePresetChange = useCallback((e: Event) => {
     const id = (e.target as HTMLSelectElement).value
-    // Guard: selecting the already-active preset is a no-op
-    if (id === selectedPresetId && !useCustom) return
+    if (id === pm.selectedPresetId && !pm.useCustom) return
     if (id === '__custom__') {
-      // Switching to custom mode — preserve current settings as-is
-      setUseCustom(true)
+      pm.setUseCustom(true)
     } else {
       applyPreset(id)
     }
-  }, [useCustom, applyPreset])
+  }, [pm.selectedPresetId, pm.useCustom, applyPreset])
 
-  // ── Autosave helpers ──────────────────────────────────────────────
-
-  // Ensure the Autosave preset exists and switch to it — single render, no flicker.
-  // Only switches to Autosave for built-in presets; custom presets stay on their own preset.
+  // Override ensureAutosavePreset to accept overrideSettings
   const ensureAutosavePreset = useCallback((overrideSettings?: EntrySettings) => {
-    const currentPreset = presets.find(p => p.id === selectedPresetId)
+    const currentPreset = pm.presets.find(p => p.id === pm.selectedPresetId)
     if (currentPreset && !currentPreset.builtIn) {
-      // Editing a custom preset — stay on it, just mark as editing
-      if (!isEditing) setIsEditing(true)
+      if (!pm.isEditing) pm.setIsEditing(true)
       return
     }
-    const autosave = presets.find(p => p.name === AUTOSAVE_NAME && !p.builtIn)
+    const autosave = pm.presets.find(p => p.name === 'Autosave' && !p.builtIn)
     if (autosave) {
-      setSelectedPresetId(autosave.id)
+      pm.setSelectedPresetId(autosave.id)
     } else {
-      const saved = saveSettingsPreset(AUTOSAVE_NAME, overrideSettings ?? settings)
-      refreshPresets()
-      setSelectedPresetId(saved.id)
+      const saved = saveSettingsPreset('Autosave', overrideSettings ?? settings)
+      pm.refreshPresets()
+      pm.setSelectedPresetId(saved.id)
     }
-    if (!isEditing) setIsEditing(true)
-  }, [presets, selectedPresetId, settings, refreshPresets, isEditing])
+    if (!pm.isEditing) pm.setIsEditing(true)
+  }, [pm.presets, pm.selectedPresetId, settings, pm.refreshPresets, pm.isEditing])
 
+  // Override doAutosave to save settings
   const doAutosave = useCallback(() => {
-    if (!isEditing) return
+    if (!pm.isEditing) return
 
-    const currentPreset = presets.find(p => p.id === selectedPresetId)
+    const currentPreset = pm.presets.find(p => p.id === pm.selectedPresetId)
     if (currentPreset && !currentPreset.builtIn) {
-      updateSettingsPreset(selectedPresetId, { settings })
-      refreshPresets()
+      updateSettingsPreset(pm.selectedPresetId, { settings })
+      pm.refreshPresets()
       return
     }
 
-    const existing = findSettingsPresetByName(AUTOSAVE_NAME)
+    const existing = findSettingsPresetByName('Autosave')
     let saved: SettingsPreset
     if (existing) {
       const updated = updateSettingsPreset(existing.id, { settings })
       if (!updated) return
       saved = updated
     } else {
-      saved = saveSettingsPreset(AUTOSAVE_NAME, settings)
+      saved = saveSettingsPreset('Autosave', settings)
     }
-    refreshPresets()
-    setSelectedPresetId(saved.id)
-    setIsEditing(false)
-  }, [isEditing, settings, refreshPresets, presets, selectedPresetId])
+    pm.refreshPresets()
+    pm.setSelectedPresetId(saved.id)
+    pm.setIsEditing(false)
+  }, [pm.isEditing, settings, pm.refreshPresets, pm.presets, pm.selectedPresetId])
 
-  // Wire up the early ref
-  doAutosaveRef.current = doAutosave
+  // Wire the overrides into the hook's refs
+  pm.doAutosaveRef.current = doAutosave
 
-  const stopAutosaveInterval = useCallback(() => {
-    if (autosaveIntervalRef.current !== null) {
-      clearInterval(autosaveIntervalRef.current)
-      autosaveIntervalRef.current = null
-    }
-  }, [])
-
-  const startAutosaveInterval = useCallback(() => {
-    stopAutosaveInterval()
-    autosaveIntervalRef.current = setInterval(() => doAutosaveRef.current?.(), 3000)
-  }, [stopAutosaveInterval])
-
-  // Final save on unmount only (modal close)
-  useEffect(() => {
-    return () => {
-      doAutosaveRef.current?.()
-      stopAutosaveInterval()
-    }
-  }, [])
-
-  // Start/stop interval when editing state changes
-  useEffect(() => {
-    if (isEditing) {
-      doAutosaveRef.current?.()
-      startAutosaveInterval()
-    } else {
-      stopAutosaveInterval()
-    }
-  }, [isEditing])
-
-  const handleSavePreset = useCallback(() => {
-    if (!saveName.trim()) return
-    stopAutosaveInterval()
-    setIsEditing(false)
-    const saved = saveSettingsPreset(saveName.trim(), settings)
-    refreshPresets()
-    setSelectedPresetId(saved.id)
-    setUseCustom(false)
-    setSaveName('')
-    setShowSaveDialog(false)
-  }, [saveName, settings, refreshPresets, stopAutosaveInterval])
-
-  const selectedPreset = presets.find((p) => p.id === selectedPresetId)
-
-  const handleDeleteClick = useCallback(() => {
-    setShowDeleteConfirm(true)
-  }, [])
-
+  // Override handleConfirmDelete to restore default settings
   const handleConfirmDelete = useCallback(() => {
-    if (!selectedPreset) return
-    deleteSettingsPreset(selectedPreset.id)
-    refreshPresets()
-    if (selectedPresetId === selectedPreset.id) {
-      setSelectedPresetId('default')
-      setIsEditing(false)
+    if (!pm.selectedPreset) return
+    deleteSettingsPreset(pm.selectedPreset.id)
+    pm.refreshPresets()
+    if (pm.selectedPresetId === pm.selectedPreset.id) {
+      pm.setSelectedPresetId('default')
+      pm.setIsEditing(false)
       const defaultPreset = getSettingsPreset('default')
       if (defaultPreset) onSettingsChange({ ...defaultPreset.settings })
     }
-    setShowDeleteConfirm(false)
-  }, [selectedPreset, selectedPresetId, refreshPresets, onSettingsChange])
+    pm.setShowDeleteConfirm(false)
+  }, [pm.selectedPreset, pm.selectedPresetId, pm.refreshPresets, onSettingsChange])
 
-  const handleCancelDelete = useCallback(() => {
-    setShowDeleteConfirm(false)
-  }, [])
-
-  // Close delete confirmation if selectedPresetId changes externally
-  useEffect(() => {
-    if (showDeleteConfirm) setShowDeleteConfirm(false)
-  }, [selectedPresetId])
-
-  const handleExport = useCallback(() => {
-    const json = exportSettingsPresets()
-    const blob = new Blob([json], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `chronicle-settings-${new Date().toISOString().slice(0, 10)}.json`
-    a.click()
-    URL.revokeObjectURL(url)
-  }, [])
-
-  const handleImportFile = useCallback((e: Event) => {
-    const input = e.target as HTMLInputElement
-    const file = input.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => {
-      const text = reader.result as string
-      const result = importSettingsPresets(text)
-      if (result.success) {
-        refreshPresets()
-        setImportError(null)
-      } else {
-        setImportError(result.error || 'Import failed')
-      }
-    }
-    reader.readAsText(file)
-    input.value = ''
-  }, [refreshPresets])
-
-  const handleTriggerImport = useCallback(() => {
-    fileInputRef.current?.click()
-  }, [])
+  // Save-as-preset handler
+  const handleSavePreset = useCallback(() => {
+    if (!pm.saveName.trim()) return
+    pm.stopAutosaveInterval()
+    pm.setIsEditing(false)
+    const saved = saveSettingsPreset(pm.saveName.trim(), settings)
+    pm.refreshPresets()
+    pm.setSelectedPresetId(saved.id)
+    pm.setUseCustom(false)
+    pm.setSaveName('')
+    pm.setShowSaveDialog(false)
+  }, [pm.saveName, settings, pm.refreshPresets, pm.stopAutosaveInterval])
 
   // Generic field updater
   const update = useCallback(<K extends keyof EntrySettings>(key: K, value: EntrySettings[K]) => {
     const newSettings = { ...settings, [key]: value }
     onSettingsChange(newSettings)
-    // Only autosave when editing a custom preset or in custom mode —
-    // built-in presets like "Always Active" should not be overridden.
-    if (useCustom || (selectedPreset && !selectedPreset.builtIn)) {
+    if (pm.useCustom || (pm.selectedPreset && !pm.selectedPreset.builtIn)) {
       ensureAutosavePreset(newSettings)
     }
-  }, [settings, onSettingsChange, ensureAutosavePreset, useCustom, selectedPreset])
+  }, [settings, onSettingsChange, ensureAutosavePreset, pm.useCustom, pm.selectedPreset])
 
   // Toggle helper
   const toggle = useCallback(<K extends keyof EntrySettings>(key: K) => {
@@ -274,11 +175,11 @@ export const SettingsManager: FunctionComponent<Props> = ({
         <label class="chronicle-sm-label">Lorebook Settings Preset</label>
         <select
           class="chronicle-sm-select"
-          value={useCustom ? '__custom__' : selectedPresetId}
+          value={pm.useCustom ? '__custom__' : pm.selectedPresetId}
           onChange={handlePresetChange}
           disabled={loading}
         >
-          {presets.map((p) => (
+          {pm.presets.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}{p.builtIn ? '' : ' (custom)'}
             </option>
@@ -296,10 +197,10 @@ export const SettingsManager: FunctionComponent<Props> = ({
           {expanded ? '\u25bc' : '\u25b6'} View settings
         </span>
         <div class="chronicle-sm-toolbar">
-          {selectedPreset && !selectedPreset.builtIn && (
+          {pm.selectedPreset && !pm.selectedPreset.builtIn && (
             <button
               class="chronicle-sm-delete-btn"
-              onClick={handleDeleteClick}
+              onClick={pm.handleDeleteClick}
               disabled={loading}
               title="Delete this preset"
             >
@@ -308,34 +209,34 @@ export const SettingsManager: FunctionComponent<Props> = ({
           )}
           <button
             class="chronicle-sm-tool-btn"
-            onClick={() => setShowSaveDialog(true)}
-            disabled={loading || !useCustom}
+            onClick={() => pm.setShowSaveDialog(true)}
+            disabled={loading || !pm.useCustom}
             title="Save as preset"
           >
             Save
           </button>
           <button
             class="chronicle-sm-tool-btn"
-            onClick={handleExport}
-            disabled={presets.filter((p) => !p.builtIn).length === 0}
+            onClick={pm.handleExport}
+            disabled={pm.presets.filter((p) => !p.builtIn).length === 0}
             title="Export custom presets"
           >
             Export
           </button>
           <button
             class="chronicle-sm-tool-btn"
-            onClick={handleTriggerImport}
+            onClick={pm.handleTriggerImport}
             disabled={loading}
             title="Import presets from file"
           >
             Import
           </button>
           <input
-            ref={fileInputRef}
+            ref={pm.fileInputRef}
             type="file"
             accept=".json"
             style={{ display: 'none' }}
-            onChange={handleImportFile}
+            onChange={pm.handleImportFile}
           />
         </div>
       </div>
@@ -403,117 +304,55 @@ export const SettingsManager: FunctionComponent<Props> = ({
           <div class="chronicle-sm-field-group">
             <div class="chronicle-sm-toggle-row">
               <label class="chronicle-sm-toggle">
-                <input
-                  type="checkbox"
-                  checked={settings.selective}
-                  onChange={() => toggle('selective')}
-                  disabled={loading}
-                />
+                <input type="checkbox" checked={settings.selective} onChange={() => toggle('selective')} disabled={loading} />
                 <span>Selective</span>
               </label>
               <label class="chronicle-sm-toggle">
-                <input
-                  type="checkbox"
-                  checked={settings.constant}
-                  onChange={() => toggle('constant')}
-                  disabled={loading}
-                />
+                <input type="checkbox" checked={settings.constant} onChange={() => toggle('constant')} disabled={loading} />
                 <span>Constant</span>
               </label>
               <label class="chronicle-sm-toggle">
-                <input
-                  type="checkbox"
-                  checked={settings.disabled}
-                  onChange={() => toggle('disabled')}
-                  disabled={loading}
-                />
+                <input type="checkbox" checked={settings.disabled} onChange={() => toggle('disabled')} disabled={loading} />
                 <span>Disabled</span>
               </label>
               <label class="chronicle-sm-toggle">
-                <input
-                  type="checkbox"
-                  checked={settings.caseSensitive}
-                  onChange={() => toggle('caseSensitive')}
-                  disabled={loading}
-                />
+                <input type="checkbox" checked={settings.caseSensitive} onChange={() => toggle('caseSensitive')} disabled={loading} />
                 <span>Case Sensitive</span>
               </label>
               <label class="chronicle-sm-toggle">
-                <input
-                  type="checkbox"
-                  checked={settings.matchWholeWords}
-                  onChange={() => toggle('matchWholeWords')}
-                  disabled={loading}
-                />
+                <input type="checkbox" checked={settings.matchWholeWords} onChange={() => toggle('matchWholeWords')} disabled={loading} />
                 <span>Match Whole Words</span>
               </label>
               <label class="chronicle-sm-toggle">
-                <input
-                  type="checkbox"
-                  checked={settings.useRegex}
-                  onChange={() => toggle('useRegex')}
-                  disabled={loading}
-                />
+                <input type="checkbox" checked={settings.useRegex} onChange={() => toggle('useRegex')} disabled={loading} />
                 <span>Use Regex</span>
               </label>
               <label class="chronicle-sm-toggle">
-                <input
-                  type="checkbox"
-                  checked={settings.useProbability}
-                  onChange={() => toggle('useProbability')}
-                  disabled={loading}
-                />
+                <input type="checkbox" checked={settings.useProbability} onChange={() => toggle('useProbability')} disabled={loading} />
                 <span>Use Probability</span>
               </label>
               <label class="chronicle-sm-toggle">
-                <input
-                  type="checkbox"
-                  checked={settings.vectorized}
-                  onChange={() => toggle('vectorized')}
-                  disabled={loading}
-                />
+                <input type="checkbox" checked={settings.vectorized} onChange={() => toggle('vectorized')} disabled={loading} />
                 <span>Vectorized</span>
               </label>
             </div>
             <div class="chronicle-sm-field-row">
               <div class="chronicle-sm-field chronicle-sm-field-small">
                 <label class="chronicle-sm-field-label">Probability</label>
-                <input
-                  type="number"
-                  class="chronicle-sm-input"
-                  value={settings.probability}
-                  min={0}
-                  max={100}
-                  onInput={(e) => update('probability', parseInt((e.target as HTMLInputElement).value) || 0)}
-                />
+                <input type="number" class="chronicle-sm-input" value={settings.probability} min={0} max={100}
+                  onInput={(e) => update('probability', parseInt((e.target as HTMLInputElement).value) || 0)} />
               </div>
               <div class="chronicle-sm-field chronicle-sm-field-small">
                 <label class="chronicle-sm-field-label">Scan Depth</label>
-                <input
-                  type="number"
-                  class="chronicle-sm-input"
-                  value={settings.scanDepth ?? ''}
-                  min={0}
-                  placeholder="Default"
-                  onInput={(e) => {
-                    const val = (e.target as HTMLInputElement).value
-                    update('scanDepth', val === '' ? null : parseInt(val) || 0)
-                  }}
-                />
+                <input type="number" class="chronicle-sm-input" value={settings.scanDepth ?? ''} min={0} placeholder="Default"
+                  onInput={(e) => { const val = (e.target as HTMLInputElement).value; update('scanDepth', val === '' ? null : parseInt(val) || 0) }} />
               </div>
               {settings.selective && (
                 <div class="chronicle-sm-field">
                   <label class="chronicle-sm-field-label">Selective Logic</label>
-                  <select
-                    class="chronicle-sm-select"
-                    value={settings.selectiveLogic}
-                    onChange={(e) => update('selectiveLogic', Number((e.target as HTMLSelectElement).value) as 0|1|2|3)}
-                  >
-                    {SELECTIVE_LOGIC_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
+                  <select class="chronicle-sm-select" value={settings.selectiveLogic}
+                    onChange={(e) => update('selectiveLogic', Number((e.target as HTMLSelectElement).value) as 0|1|2|3)}>
+                    {SELECTIVE_LOGIC_OPTIONS.map((opt) => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
                   </select>
                 </div>
               )}
@@ -521,11 +360,7 @@ export const SettingsManager: FunctionComponent<Props> = ({
           </div>
 
           {/* Timing (collapsible) */}
-          <button
-            type="button"
-            class="chronicle-sm-group-toggle"
-            onClick={() => setTimingOpen((o) => !o)}
-          >
+          <button type="button" class="chronicle-sm-group-toggle" onClick={() => setTimingOpen((o) => !o)}>
             <span class={`chronicle-sm-chevron ${timingOpen ? 'chronicle-sm-chevron-open' : ''}`}>&#x25B6;</span>
             Timing
           </button>
@@ -534,53 +369,30 @@ export const SettingsManager: FunctionComponent<Props> = ({
               <div class="chronicle-sm-field-row">
                 <div class="chronicle-sm-field chronicle-sm-field-small">
                   <label class="chronicle-sm-field-label">Priority</label>
-                  <input
-                    type="number"
-                    class="chronicle-sm-input"
-                    value={settings.priority}
-                    onInput={(e) => update('priority', parseInt((e.target as HTMLInputElement).value) || 0)}
-                  />
+                  <input type="number" class="chronicle-sm-input" value={settings.priority}
+                    onInput={(e) => update('priority', parseInt((e.target as HTMLInputElement).value) || 0)} />
                 </div>
                 <div class="chronicle-sm-field chronicle-sm-field-small">
                   <label class="chronicle-sm-field-label">Sticky</label>
-                  <input
-                    type="number"
-                    class="chronicle-sm-input"
-                    value={settings.sticky}
-                    min={0}
-                    onInput={(e) => update('sticky', parseInt((e.target as HTMLInputElement).value) || 0)}
-                  />
+                  <input type="number" class="chronicle-sm-input" value={settings.sticky} min={0}
+                    onInput={(e) => update('sticky', parseInt((e.target as HTMLInputElement).value) || 0)} />
                 </div>
                 <div class="chronicle-sm-field chronicle-sm-field-small">
                   <label class="chronicle-sm-field-label">Cooldown</label>
-                  <input
-                    type="number"
-                    class="chronicle-sm-input"
-                    value={settings.cooldown}
-                    min={0}
-                    onInput={(e) => update('cooldown', parseInt((e.target as HTMLInputElement).value) || 0)}
-                  />
+                  <input type="number" class="chronicle-sm-input" value={settings.cooldown} min={0}
+                    onInput={(e) => update('cooldown', parseInt((e.target as HTMLInputElement).value) || 0)} />
                 </div>
                 <div class="chronicle-sm-field chronicle-sm-field-small">
                   <label class="chronicle-sm-field-label">Delay</label>
-                  <input
-                    type="number"
-                    class="chronicle-sm-input"
-                    value={settings.delay}
-                    min={0}
-                    onInput={(e) => update('delay', parseInt((e.target as HTMLInputElement).value) || 0)}
-                  />
+                  <input type="number" class="chronicle-sm-input" value={settings.delay} min={0}
+                    onInput={(e) => update('delay', parseInt((e.target as HTMLInputElement).value) || 0)} />
                 </div>
               </div>
             </div>
           )}
 
           {/* Recursion (collapsible) */}
-          <button
-            type="button"
-            class="chronicle-sm-group-toggle"
-            onClick={() => setRecursionOpen((o) => !o)}
-          >
+          <button type="button" class="chronicle-sm-group-toggle" onClick={() => setRecursionOpen((o) => !o)}>
             <span class={`chronicle-sm-chevron ${recursionOpen ? 'chronicle-sm-chevron-open' : ''}`}>&#x25B6;</span>
             Recursion{settings.vectorized ? ' (inactive for vector)' : ''}
           </button>
@@ -593,30 +405,15 @@ export const SettingsManager: FunctionComponent<Props> = ({
               )}
               <div class="chronicle-sm-toggle-row">
                 <label class="chronicle-sm-toggle">
-                  <input
-                    type="checkbox"
-                    checked={settings.preventRecursion}
-                    onChange={() => toggle('preventRecursion')}
-                    disabled={loading || settings.vectorized}
-                  />
+                  <input type="checkbox" checked={settings.preventRecursion} onChange={() => toggle('preventRecursion')} disabled={loading || settings.vectorized} />
                   <span>Prevent Recursion</span>
                 </label>
                 <label class="chronicle-sm-toggle">
-                  <input
-                    type="checkbox"
-                    checked={settings.excludeRecursion}
-                    onChange={() => toggle('excludeRecursion')}
-                    disabled={loading || settings.vectorized}
-                  />
+                  <input type="checkbox" checked={settings.excludeRecursion} onChange={() => toggle('excludeRecursion')} disabled={loading || settings.vectorized} />
                   <span>Exclude Recursion</span>
                 </label>
                 <label class="chronicle-sm-toggle">
-                  <input
-                    type="checkbox"
-                    checked={settings.delayUntilRecursion}
-                    onChange={() => toggle('delayUntilRecursion')}
-                    disabled={loading || settings.vectorized}
-                  />
+                  <input type="checkbox" checked={settings.delayUntilRecursion} onChange={() => toggle('delayUntilRecursion')} disabled={loading || settings.vectorized} />
                   <span>Delay Until Recursion</span>
                 </label>
               </div>
@@ -624,11 +421,7 @@ export const SettingsManager: FunctionComponent<Props> = ({
           )}
 
           {/* Group (collapsible) */}
-          <button
-            type="button"
-            class="chronicle-sm-group-toggle"
-            onClick={() => setGroupOpen((o) => !o)}
-          >
+          <button type="button" class="chronicle-sm-group-toggle" onClick={() => setGroupOpen((o) => !o)}>
             <span class={`chronicle-sm-chevron ${groupOpen ? 'chronicle-sm-chevron-open' : ''}`}>&#x25B6;</span>
             Group
           </button>
@@ -637,41 +430,24 @@ export const SettingsManager: FunctionComponent<Props> = ({
               <div class="chronicle-sm-field-row">
                 <div class="chronicle-sm-field">
                   <label class="chronicle-sm-field-label">Group Name</label>
-                  <input
-                    type="text"
-                    class="chronicle-sm-input"
-                    value={settings.groupName}
-                    onInput={(e) => update('groupName', (e.target as HTMLInputElement).value)}
-                  />
+                  <input type="text" class="chronicle-sm-input" value={settings.groupName}
+                    onInput={(e) => update('groupName', (e.target as HTMLInputElement).value)} />
                 </div>
                 <div class="chronicle-sm-field chronicle-sm-field-small">
                   <label class="chronicle-sm-field-label">Weight</label>
-                  <input
-                    type="number"
-                    class="chronicle-sm-input"
-                    value={settings.groupWeight}
-                    onInput={(e) => update('groupWeight', parseInt((e.target as HTMLInputElement).value) || 0)}
-                  />
+                  <input type="number" class="chronicle-sm-input" value={settings.groupWeight}
+                    onInput={(e) => update('groupWeight', parseInt((e.target as HTMLInputElement).value) || 0)} />
                 </div>
               </div>
               <label class="chronicle-sm-toggle">
-                <input
-                  type="checkbox"
-                  checked={settings.groupOverride}
-                  onChange={() => toggle('groupOverride')}
-                  disabled={loading}
-                />
+                <input type="checkbox" checked={settings.groupOverride} onChange={() => toggle('groupOverride')} disabled={loading} />
                 <span>Group Override</span>
               </label>
             </div>
           )}
 
           {/* Metadata (collapsible) */}
-          <button
-            type="button"
-            class="chronicle-sm-group-toggle"
-            onClick={() => setMetadataOpen((o) => !o)}
-          >
+          <button type="button" class="chronicle-sm-group-toggle" onClick={() => setMetadataOpen((o) => !o)}>
             <span class={`chronicle-sm-chevron ${metadataOpen ? 'chronicle-sm-chevron-open' : ''}`}>&#x25B6;</span>
             Metadata
           </button>
@@ -679,12 +455,8 @@ export const SettingsManager: FunctionComponent<Props> = ({
             <div class="chronicle-sm-field-group">
               <div class="chronicle-sm-field">
                 <label class="chronicle-sm-field-label">Automation ID</label>
-                <input
-                  type="text"
-                  class="chronicle-sm-input"
-                  value={settings.automationId}
-                  onInput={(e) => update('automationId', (e.target as HTMLInputElement).value)}
-                />
+                <input type="text" class="chronicle-sm-input" value={settings.automationId}
+                  onInput={(e) => update('automationId', (e.target as HTMLInputElement).value)} />
               </div>
             </div>
           )}
@@ -692,26 +464,26 @@ export const SettingsManager: FunctionComponent<Props> = ({
       )}
 
       {/* Import error */}
-      {importError && (
-        <div class="chronicle-sm-error">{importError}</div>
+      {pm.importError && (
+        <div class="chronicle-sm-error">{pm.importError}</div>
       )}
 
       {/* Save dialog */}
-      {showSaveDialog && (
-        <div class="chronicle-sm-overlay" onClick={() => setShowSaveDialog(false)}>
+      {pm.showSaveDialog && (
+        <div class="chronicle-sm-overlay" onClick={() => pm.setShowSaveDialog(false)}>
           <div class="chronicle-sm-dialog" onClick={(e) => e.stopPropagation()}>
             <h4>Save Settings as Preset</h4>
             <input
               class="chronicle-sm-input"
-              value={saveName}
-              onInput={(e) => setSaveName((e.target as HTMLInputElement).value)}
+              value={pm.saveName}
+              onInput={(e) => pm.setSaveName((e.target as HTMLInputElement).value)}
               placeholder="Preset name…"
               onKeyDown={(e) => e.key === 'Enter' && handleSavePreset()}
               autoFocus
             />
             <div class="chronicle-sm-dialog-actions">
-              <button class="chronicle-sm-dialog-btn" onClick={() => setShowSaveDialog(false)}>Cancel</button>
-              <button class="chronicle-sm-dialog-btn chronicle-sm-dialog-primary" onClick={handleSavePreset} disabled={!saveName.trim()}>
+              <button class="chronicle-sm-dialog-btn" onClick={() => pm.setShowSaveDialog(false)}>Cancel</button>
+              <button class="chronicle-sm-dialog-btn chronicle-sm-dialog-primary" onClick={handleSavePreset} disabled={!pm.saveName.trim()}>
                 Save
               </button>
             </div>
@@ -719,18 +491,18 @@ export const SettingsManager: FunctionComponent<Props> = ({
         </div>
       )}
 
-      {showDeleteConfirm && selectedPreset && (
-        <div class="chronicle-dc-overlay" onClick={handleCancelDelete}>
+      {pm.showDeleteConfirm && pm.selectedPreset && (
+        <div class="chronicle-dc-overlay" onClick={pm.handleCancelDelete}>
           <div class="chronicle-dc-dialog" onClick={(e) => e.stopPropagation()}>
             <h4>Delete Preset</h4>
             <p class="chronicle-dc-message">
-              Are you sure you want to delete <strong>{selectedPreset.name}</strong>? This cannot be undone.
+              Are you sure you want to delete <strong>{pm.selectedPreset.name}</strong>? This cannot be undone.
             </p>
             <div class="chronicle-dc-actions">
               <button class="chronicle-dc-btn chronicle-dc-btn-delete" onClick={handleConfirmDelete}>
                 Delete Preset
               </button>
-              <button class="chronicle-dc-btn" onClick={handleCancelDelete}>Cancel</button>
+              <button class="chronicle-dc-btn" onClick={pm.handleCancelDelete}>Cancel</button>
             </div>
           </div>
         </div>

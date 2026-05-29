@@ -1,9 +1,10 @@
 /**
  * PromptManager — Prompt preset selector with custom editor, save/export/import.
+ * Uses usePresetManager for shared preset CRUD/autosave/export/import logic.
  */
-import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks'
+import { useState, useEffect, useCallback, useMemo } from 'preact/hooks'
 import type { FunctionComponent } from 'preact'
-import { usePersistedState } from '../hooks'
+import { usePresetManager } from '../usePresetManager'
 import { getAllPresets, getPreset, savePreset, updatePreset, findPresetByName, deletePreset, exportPresets, importPresets, getOldFormatPresets, DEFAULT_PARAMS, type PromptPreset } from '../presets'
 import type { GenerationParams } from '../types'
 
@@ -18,183 +19,72 @@ export const PromptManager: FunctionComponent<Props> = ({
   onParamsChange,
   loading = false,
 }) => {
-  const [presets, setPresets] = useState<PromptPreset[]>([])
+  const pm = usePresetManager<PromptPreset>({
+    selectedKey: 'chronicle_selected_prompt_preset',
+    loadAll: getAllPresets,
+    save: (name) => savePreset(name, '', params),
+    update: (id, updates) => updatePreset(id, updates as { systemPrompt?: string; params?: GenerationParams }),
+    findByName: findPresetByName,
+    deletePreset: deletePreset,
+    exportAll: exportPresets,
+    importAll: importPresets,
+  })
+
+  // PromptManager-specific state
   const [params, setParams] = useState<GenerationParams>({ ...DEFAULT_PARAMS })
-
-  const [selectedPresetId, setSelectedPresetId] = usePersistedState<string>(
-    'chronicle_selected_prompt_preset', 'default'
-  )
-  const [useCustom, setUseCustom] = useState(false)
-  const [isEditing, setIsEditing] = useState(false)
   const [customPrompt, setCustomPrompt] = useState('')
-  const [showSaveDialog, setShowSaveDialog] = useState(false)
-  const [saveName, setSaveName] = useState('')
-  const [importError, setImportError] = useState<string | null>(null)
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [expanded, setExpanded] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const autosaveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const AUTOSAVE_NAME = 'Autosave'
-
-  useEffect(() => {
-    setPresets(getAllPresets())
-  }, [])
-
-  const refreshPresets = useCallback(() => {
-    setPresets(getAllPresets())
-  }, [])
 
   // Compute the effective active prompt and report it to parent
   const activePrompt = useMemo((): string | undefined => {
-    if (useCustom && customPrompt.trim()) return customPrompt.trim()
-    if (!useCustom) {
-      const preset = getPreset(selectedPresetId)
+    if (pm.useCustom && customPrompt.trim()) return customPrompt.trim()
+    if (!pm.useCustom) {
+      const preset = getPreset(pm.selectedPresetId)
       return preset?.systemPrompt
     }
     return undefined
-  }, [useCustom, customPrompt, selectedPresetId])
+  }, [pm.useCustom, customPrompt, pm.selectedPresetId])
 
   useEffect(() => {
     onActivePromptChange?.(activePrompt)
   }, [activePrompt, onActivePromptChange])
 
-  // Fallback: sync params when preset changes via non-handler path (e.g. undo/redo)
+  // Sync params when preset changes via non-handler path
   useEffect(() => {
-    if (!useCustom && selectedPresetId) {
-      const preset = getPreset(selectedPresetId)
+    if (!pm.useCustom && pm.selectedPresetId) {
+      const preset = getPreset(pm.selectedPresetId)
       if (preset?.params) {
         setParams({ ...preset.params })
       } else {
         setParams({ ...DEFAULT_PARAMS })
       }
     }
-  }, [selectedPresetId, useCustom])
+  }, [pm.selectedPresetId, pm.useCustom])
 
   useEffect(() => {
     onParamsChange?.(params)
   }, [params, onParamsChange])
 
-  // ── Autosave helpers ──────────────────────────────────────────────
+  // ── PromptManager-specific overrides ─────────────────────────────
 
-  // Ensure the Autosave preset exists and switch to it — single render, no flicker.
-  // Only switches to Autosave for built-in presets; custom presets stay on their own preset.
-  // When switching to an existing Autosave, immediately loads its stored params
-  // to prevent the stale-closure effect race (doAutosave firing with DEFAULT_PARAMS
-  // before the params-loading effect runs).
-  const ensureAutosavePreset = useCallback((promptOverride?: string) => {
-    const currentPreset = presets.find(p => p.id === selectedPresetId)
-    if (currentPreset && !currentPreset.builtIn) {
-      if (!isEditing) setIsEditing(true)
-      return
-    }
-    // Built-in preset: seed customPrompt if called without prompt text (e.g. param change)
-    if (promptOverride === undefined && !customPrompt.trim() && currentPreset?.systemPrompt) {
-      setCustomPrompt(currentPreset.systemPrompt)
-    }
-
-    // Check localStorage directly to guard against stale presets state (race condition
-    // from rapid slider events creating duplicate Autosave presets)
-    const localAutosave = findPresetByName(AUTOSAVE_NAME)
-    if (localAutosave) {
-      setSelectedPresetId(localAutosave.id)
-      // Immediately load stored params so doAutosave (fired by isEditing effect) doesn't
-      // overwrite with the stale closure's DEFAULT_PARAMS before this effect runs.
-      if (localAutosave.params) setParams({ ...localAutosave.params })
-    } else {
-      const saved = savePreset(AUTOSAVE_NAME, promptOverride ?? (customPrompt || currentPreset?.systemPrompt || ''), params)
-      refreshPresets()
-      setSelectedPresetId(saved.id)
-    }
-    if (!isEditing) setIsEditing(true)
-  }, [presets, selectedPresetId, customPrompt, params, refreshPresets, isEditing])
-
-  const doAutosave = useCallback(() => {
-    if (!isEditing) return
-
-    const currentPreset = presets.find(p => p.id === selectedPresetId)
-    if (currentPreset && !currentPreset.builtIn) {
-      // Custom preset: save params always, prompt only if non-empty
-      const update: { params: GenerationParams; systemPrompt?: string } = { params }
-      if (customPrompt.trim()) update.systemPrompt = customPrompt
-      updatePreset(selectedPresetId, update)
-      refreshPresets()
-      return
-    }
-
-    if (!customPrompt.trim()) return
-
-    const existing = findPresetByName(AUTOSAVE_NAME)
-    let saved: PromptPreset
-    if (existing) {
-      const updated = updatePreset(existing.id, { systemPrompt: customPrompt, params })
-      if (!updated) return
-      saved = updated
-    } else {
-      saved = savePreset(AUTOSAVE_NAME, customPrompt, params)
-    }
-    refreshPresets()
-    setSelectedPresetId(saved.id)
-    setIsEditing(false)
-  }, [isEditing, customPrompt, params, refreshPresets, presets, selectedPresetId])
-
-  // Ref to latest doAutosave so interval callbacks never go stale
-  const doAutosaveRef = useRef(doAutosave)
-  doAutosaveRef.current = doAutosave
-
-  const stopAutosaveInterval = useCallback(() => {
-    if (autosaveIntervalRef.current !== null) {
-      clearInterval(autosaveIntervalRef.current)
-      autosaveIntervalRef.current = null
-    }
-  }, [])
-
-  const startAutosaveInterval = useCallback(() => {
-    stopAutosaveInterval()
-    autosaveIntervalRef.current = setInterval(() => doAutosaveRef.current(), 3000)
-  }, [stopAutosaveInterval])
-
-  // Final save on unmount only (modal close)
-  useEffect(() => {
-    return () => {
-      doAutosaveRef.current()
-      stopAutosaveInterval()
-    }
-  }, [])
-
-  // Start/stop interval when editing state changes
-  useEffect(() => {
-    if (isEditing && customPrompt.trim()) {
-      doAutosaveRef.current()
-      startAutosaveInterval()
-    } else {
-      stopAutosaveInterval()
-    }
-  }, [isEditing, customPrompt])
-
+  // Override handlePresetChange to seed customPrompt and load params
   const handlePresetChange = useCallback((e: Event) => {
     const id = (e.target as HTMLSelectElement).value
-
-    // No-op guard: skip if the already-active preset is re-selected
-    // (mirrors SettingsManager's guard, prevents unnecessary effect firings)
-    if (id === selectedPresetId && !useCustom) return
+    if (id === pm.selectedPresetId && !pm.useCustom) return
 
     if (id === '__custom__') {
-      if (!useCustom) {
-        const current = getPreset(selectedPresetId)
+      if (!pm.useCustom) {
+        const current = getPreset(pm.selectedPresetId)
         if (current) setCustomPrompt(current.systemPrompt || '')
       }
-      setUseCustom(true)
+      pm.setUseCustom(true)
     } else {
-      // Save current edits before switching away
-      doAutosaveRef.current()
-      stopAutosaveInterval()
-      setSelectedPresetId(id)
-      setUseCustom(false)
-      setIsEditing(false)
+      pm.doAutosaveRef.current?.()
+      pm.stopAutosaveInterval()
+      pm.setSelectedPresetId(id)
+      pm.setUseCustom(false)
+      pm.setIsEditing(false)
       setCustomPrompt('')
-      // Immediately load the preset's params to avoid the stale-closure effect race:
-      // the [isEditing, customPrompt] effect fires doAutosave before the
-      // [selectedPresetId, useCustom] effect loads correct params.
       const preset = getPreset(id)
       if (preset?.params) {
         setParams({ ...preset.params })
@@ -202,83 +92,98 @@ export const PromptManager: FunctionComponent<Props> = ({
         setParams({ ...DEFAULT_PARAMS })
       }
     }
-  }, [selectedPresetId, useCustom, stopAutosaveInterval])
+  }, [pm.selectedPresetId, pm.useCustom, pm.stopAutosaveInterval])
 
-  const selectedPreset = presets.find((p) => p.id === selectedPresetId)
+  // Override ensureAutosavePreset to seed customPrompt and load params
+  const ensureAutosavePreset = useCallback((promptOverride?: string) => {
+    const currentPreset = pm.presets.find(p => p.id === pm.selectedPresetId)
+    if (currentPreset && !currentPreset.builtIn) {
+      if (!pm.isEditing) pm.setIsEditing(true)
+      return
+    }
+    if (promptOverride === undefined && !customPrompt.trim() && currentPreset?.systemPrompt) {
+      setCustomPrompt(currentPreset.systemPrompt)
+    }
+    const localAutosave = findPresetByName('Autosave')
+    if (localAutosave) {
+      pm.setSelectedPresetId(localAutosave.id)
+      if (localAutosave.params) setParams({ ...localAutosave.params })
+    } else {
+      const saved = savePreset('Autosave', promptOverride ?? (customPrompt || currentPreset?.systemPrompt || ''), params)
+      pm.refreshPresets()
+      pm.setSelectedPresetId(saved.id)
+    }
+    if (!pm.isEditing) pm.setIsEditing(true)
+  }, [pm.presets, pm.selectedPresetId, customPrompt, params, pm.refreshPresets, pm.isEditing])
 
-  const handleSavePreset = useCallback(() => {
-    if (!saveName.trim()) return
-    if (!activePrompt) return
-    stopAutosaveInterval()
-    setIsEditing(false)
-    const saved = savePreset(saveName.trim(), activePrompt, params)
-    refreshPresets()
-    setSelectedPresetId(saved.id)
-    setUseCustom(false)
-    setSaveName('')
-    setShowSaveDialog(false)
-  }, [saveName, activePrompt, params, refreshPresets, stopAutosaveInterval])
+  // Override doAutosave to save customPrompt + params
+  const doAutosave = useCallback(() => {
+    if (!pm.isEditing) return
 
-  const handleDeleteClick = useCallback(() => {
-    setShowDeleteConfirm(true)
-  }, [])
+    const currentPreset = pm.presets.find(p => p.id === pm.selectedPresetId)
+    if (currentPreset && !currentPreset.builtIn) {
+      const update: { params: GenerationParams; systemPrompt?: string } = { params }
+      if (customPrompt.trim()) update.systemPrompt = customPrompt
+      updatePreset(pm.selectedPresetId, update)
+      pm.refreshPresets()
+      return
+    }
 
+    if (!customPrompt.trim()) return
+
+    const existing = findPresetByName('Autosave')
+    let saved: PromptPreset
+    if (existing) {
+      const updated = updatePreset(existing.id, { systemPrompt: customPrompt, params })
+      if (!updated) return
+      saved = updated
+    } else {
+      saved = savePreset('Autosave', customPrompt, params)
+    }
+    pm.refreshPresets()
+    pm.setSelectedPresetId(saved.id)
+    pm.setIsEditing(false)
+  }, [pm.isEditing, customPrompt, params, pm.refreshPresets, pm.presets, pm.selectedPresetId])
+
+  // Wire the overrides into the hook's refs
+  pm.doAutosaveRef.current = doAutosave
+
+  // Override the editing-started effect to check customPrompt
+  useEffect(() => {
+    if (pm.isEditing && customPrompt.trim()) {
+      pm.doAutosaveRef.current?.()
+      pm.startAutosaveInterval()
+    } else {
+      pm.stopAutosaveInterval()
+    }
+  }, [pm.isEditing, customPrompt])
+
+  // Override handleConfirmDelete to also clear customPrompt
   const handleConfirmDelete = useCallback(() => {
-    if (!selectedPreset) return
-    deletePreset(selectedPreset.id)
-    refreshPresets()
-    if (selectedPresetId === selectedPreset.id) {
-      setSelectedPresetId('default')
-      setIsEditing(false)
+    if (!pm.selectedPreset) return
+    deletePreset(pm.selectedPreset.id)
+    pm.refreshPresets()
+    if (pm.selectedPresetId === pm.selectedPreset.id) {
+      pm.setSelectedPresetId('default')
+      pm.setIsEditing(false)
       setCustomPrompt('')
     }
-    setShowDeleteConfirm(false)
-  }, [selectedPreset, selectedPresetId, refreshPresets])
+    pm.setShowDeleteConfirm(false)
+  }, [pm.selectedPreset, pm.selectedPresetId, pm.refreshPresets])
 
-  const handleCancelDelete = useCallback(() => {
-    setShowDeleteConfirm(false)
-  }, [])
-
-  // Close delete confirmation if selectedPresetId changes externally
-  useEffect(() => {
-    if (showDeleteConfirm) setShowDeleteConfirm(false)
-  }, [selectedPresetId])
-
-  const handleExport = useCallback(() => {
-    const json = exportPresets()
-    const blob = new Blob([json], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `chronicle-presets-${new Date().toISOString().slice(0, 10)}.json`
-    a.click()
-    URL.revokeObjectURL(url)
-  }, [])
-
-  const handleImportFile = useCallback((e: Event) => {
-    const input = e.target as HTMLInputElement
-    const file = input.files?.[0]
-    if (!file) return
-
-    const reader = new FileReader()
-    reader.onload = () => {
-      const text = reader.result as string
-      const result = importPresets(text)
-      if (result.success) {
-        refreshPresets()
-        setImportError(null)
-      } else {
-        setImportError(result.error || 'Import failed')
-      }
-    }
-    reader.readAsText(file)
-    input.value = ''
-  }, [refreshPresets])
-
-  const handleTriggerImport = useCallback(() => {
-    fileInputRef.current?.click()
-  }, [])
-
+  // Save-as-preset handler
+  const handleSavePreset = useCallback(() => {
+    if (!pm.saveName.trim()) return
+    if (!activePrompt) return
+    pm.stopAutosaveInterval()
+    pm.setIsEditing(false)
+    const saved = savePreset(pm.saveName.trim(), activePrompt, params)
+    pm.refreshPresets()
+    pm.setSelectedPresetId(saved.id)
+    pm.setUseCustom(false)
+    pm.setSaveName('')
+    pm.setShowSaveDialog(false)
+  }, [pm.saveName, activePrompt, params, pm.refreshPresets, pm.stopAutosaveInterval])
 
   return (
     <div data-chronicle="prompt-manager">
@@ -292,11 +197,11 @@ export const PromptManager: FunctionComponent<Props> = ({
         <label class="chronicle-pm-label">Prompt Preset</label>
         <select
           class="chronicle-pm-select"
-          value={useCustom ? '__custom__' : selectedPresetId}
+          value={pm.useCustom ? '__custom__' : pm.selectedPresetId}
           onChange={handlePresetChange}
           disabled={loading}
         >
-          {presets.map((p) => (
+          {pm.presets.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}{p.builtIn ? '' : ' (custom)'}
             </option>
@@ -305,7 +210,7 @@ export const PromptManager: FunctionComponent<Props> = ({
         </select>
       </div>
 
-      {selectedPreset && (
+      {pm.selectedPreset && (
         <div class="chronicle-pm-preview-section">
           <div class="chronicle-pm-preview-bar">
             <span
@@ -315,10 +220,10 @@ export const PromptManager: FunctionComponent<Props> = ({
               {expanded ? '▼' : '▶'} View prompt
             </span>
             <div class="chronicle-pm-toolbar">
-              {selectedPreset && !selectedPreset.builtIn && (
+              {pm.selectedPreset && !pm.selectedPreset.builtIn && (
                 <button
                   class="chronicle-pm-delete-btn"
-                  onClick={handleDeleteClick}
+                  onClick={pm.handleDeleteClick}
                   disabled={loading}
                   title="Delete this preset"
                 >
@@ -327,34 +232,34 @@ export const PromptManager: FunctionComponent<Props> = ({
               )}
               <button
                 class="chronicle-pm-tool-btn"
-                onClick={() => setShowSaveDialog(true)}
-                disabled={loading || (!useCustom && !selectedPreset)}
+                onClick={() => pm.setShowSaveDialog(true)}
+                disabled={loading || (!pm.useCustom && !pm.selectedPreset)}
                 title="Save current custom prompt as a named preset"
               >
                 Save
               </button>
               <button
                 class="chronicle-pm-tool-btn"
-                onClick={handleExport}
-                disabled={presets.filter((p) => !p.builtIn).length === 0}
+                onClick={pm.handleExport}
+                disabled={pm.presets.filter((p) => !p.builtIn).length === 0}
                 title="Export custom presets"
               >
                 Export
               </button>
               <button
                 class="chronicle-pm-tool-btn"
-                onClick={handleTriggerImport}
+                onClick={pm.handleTriggerImport}
                 disabled={loading}
                 title="Import presets from file"
               >
                 Import
               </button>
               <input
-                ref={fileInputRef}
+                ref={pm.fileInputRef}
                 type="file"
                 accept=".json"
                 style={{ display: 'none' }}
-                onChange={handleImportFile}
+                onChange={pm.handleImportFile}
               />
             </div>
           </div>
@@ -363,7 +268,7 @@ export const PromptManager: FunctionComponent<Props> = ({
             <>
             <textarea
               class="chronicle-pm-textarea"
-              value={useCustom || isEditing ? customPrompt : (selectedPreset?.systemPrompt || '')}
+              value={pm.useCustom || pm.isEditing ? customPrompt : (pm.selectedPreset?.systemPrompt || '')}
               onInput={(e) => {
                 const val = (e.target as HTMLTextAreaElement).value
                 setCustomPrompt(val)
@@ -432,25 +337,25 @@ export const PromptManager: FunctionComponent<Props> = ({
         </div>
       )}
 
-      {importError && (
-        <div class="chronicle-pm-error">{importError}</div>
+      {pm.importError && (
+        <div class="chronicle-pm-error">{pm.importError}</div>
       )}
 
-      {showSaveDialog && (
-        <div class="chronicle-pm-overlay" onClick={() => setShowSaveDialog(false)}>
+      {pm.showSaveDialog && (
+        <div class="chronicle-pm-overlay" onClick={() => pm.setShowSaveDialog(false)}>
           <div class="chronicle-pm-dialog" onClick={(e) => e.stopPropagation()}>
             <h4>Save as Preset</h4>
             <input
               class="chronicle-pm-input"
-              value={saveName}
-              onInput={(e) => setSaveName((e.target as HTMLInputElement).value)}
+              value={pm.saveName}
+              onInput={(e) => pm.setSaveName((e.target as HTMLInputElement).value)}
               placeholder="Preset name…"
               onKeyDown={(e) => e.key === 'Enter' && handleSavePreset()}
               autoFocus
             />
             <div class="chronicle-pm-dialog-actions">
-              <button class="chronicle-pm-dialog-btn" onClick={() => setShowSaveDialog(false)}>Cancel</button>
-              <button class="chronicle-pm-dialog-btn chronicle-pm-dialog-primary" onClick={handleSavePreset} disabled={!saveName.trim()}>
+              <button class="chronicle-pm-dialog-btn" onClick={() => pm.setShowSaveDialog(false)}>Cancel</button>
+              <button class="chronicle-pm-dialog-btn chronicle-pm-dialog-primary" onClick={handleSavePreset} disabled={!pm.saveName.trim()}>
                 Save
               </button>
             </div>
@@ -458,18 +363,18 @@ export const PromptManager: FunctionComponent<Props> = ({
         </div>
       )}
 
-      {showDeleteConfirm && selectedPreset && (
-        <div class="chronicle-dc-overlay" onClick={handleCancelDelete}>
+      {pm.showDeleteConfirm && pm.selectedPreset && (
+        <div class="chronicle-dc-overlay" onClick={pm.handleCancelDelete}>
           <div class="chronicle-dc-dialog" onClick={(e) => e.stopPropagation()}>
             <h4>Delete Preset</h4>
             <p class="chronicle-dc-message">
-              Are you sure you want to delete <strong>{selectedPreset.name}</strong>? This cannot be undone.
+              Are you sure you want to delete <strong>{pm.selectedPreset.name}</strong>? This cannot be undone.
             </p>
             <div class="chronicle-dc-actions">
               <button class="chronicle-dc-btn chronicle-dc-btn-delete" onClick={handleConfirmDelete}>
                 Delete Preset
               </button>
-              <button class="chronicle-dc-btn" onClick={handleCancelDelete}>Cancel</button>
+              <button class="chronicle-dc-btn" onClick={pm.handleCancelDelete}>Cancel</button>
             </div>
           </div>
         </div>
