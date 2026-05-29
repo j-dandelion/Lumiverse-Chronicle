@@ -400,42 +400,4 @@ function validateSummaryJson(obj: unknown): { title: string; keys: string[]; con
   }
 }
 
-// ── Old-format parser (kept for reference, no longer used by default) ─
 
-/**
- * Parses the old TITLE:/CONTENT: text format.
- * Kept for reference; not used by the default flow (parseSummaryJson is preferred).
- */
-export function parseSummaryResponse(
-  text: string
-): { title: string; content: string } | null {
-  const lines = text.split('\n')
-
-  let lastTitleIdx = -1
-  let lastContentIdx = -1
-
-  for (let i = 0; i < lines.length; i++) {
-    const upperLine = lines[i].toLocaleUpperCase()
-    if (upperLine.startsWith('TITLE:')) {
-      lastTitleIdx = i
-    }
-    if (upperLine.startsWith('CONTENT:')) {
-      lastContentIdx = i
-    }
-  }
-
-  if (lastContentIdx === -1) return null
-
-  const titleLine = lastTitleIdx >= 0
-    ? lines[lastTitleIdx].slice(6).trim()
-    : null
-
-  const content = lines.slice(lastContentIdx + 1).join('\n').trim()
-
-  if (!content) return null
-
-  return {
-    title: titleLine || 'Untitled Entry',
-    content,
-  }
-}

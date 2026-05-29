@@ -101,11 +101,11 @@ export interface LorebooksListResponse {
 }
 
 export type FrontendToBackend =
-  | SummarizeRequestV2       // NEW
-  | SaveSummaryRequest       // NEW
-  | DiscardSummaryRequest    // NEW
-  | ListConnectionsRequest   // NEW
-  | ListLorebooksRequest     // NEW
+  | SummarizeRequestV2
+  | SaveSummaryRequest
+  | DiscardSummaryRequest
+  | ListConnectionsRequest
+  | ListLorebooksRequest
 
 // ── Backend → Frontend ──────────────────────────────────────────────
 
@@ -130,11 +130,11 @@ export interface DiscardConfirmed {
 export type BackendToFrontend =
   | SummarizeProgress
   | SummarizeFailed
-  | SummarizePreview         // NEW
-  | SummarizeSaved           // NEW
-  | DiscardConfirmed         // NEW
-  | ConnectionsListResponse  // NEW
-  | LorebooksListResponse    // NEW
+  | SummarizePreview
+  | SummarizeSaved
+  | DiscardConfirmed
+  | ConnectionsListResponse
+  | LorebooksListResponse
 
 // ── Validation ───────────────────────────────────────────────────────
 

@@ -312,4 +312,4 @@ export type {
   BackendToFrontend,
 } from './types'
 
-export { buildSummarizePrompt, parseSummaryResponse } from './prompts'
+export { buildSummarizePrompt } from './prompts'
