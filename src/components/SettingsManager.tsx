@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks'
 import type { FunctionComponent } from 'preact'
+import { usePersistedState } from '../hooks'
 import {
   getAllSettingsPresets,
   getSettingsPreset,
@@ -29,8 +30,6 @@ interface Props {
   loading?: boolean
 }
 
-const SETTINGS_SELECTED_KEY = 'chronicle_selected_settings_preset'
-
 export const SettingsManager: FunctionComponent<Props> = ({
   settings,
   onSettingsChange,
@@ -38,16 +37,9 @@ export const SettingsManager: FunctionComponent<Props> = ({
 }) => {
   const [presets, setPresets] = useState<SettingsPreset[]>([])
 
-  // Restore last-selected preset from localStorage
-  const restoreSelectedPreset = (): string => {
-    try {
-      const saved = localStorage.getItem(SETTINGS_SELECTED_KEY)
-      if (saved && getAllSettingsPresets().some((p) => p.id === saved)) return saved
-    } catch { /* ignore */ }
-    return 'default'
-  }
-
-  const [selectedPresetId, setSelectedPresetId] = useState<string>(restoreSelectedPreset)
+  const [selectedPresetId, setSelectedPresetId] = usePersistedState<string>(
+    'chronicle_selected_settings_preset', 'default'
+  )
   const [useCustom, setUseCustom] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [expanded, setExpanded] = useState(false)
@@ -91,7 +83,6 @@ export const SettingsManager: FunctionComponent<Props> = ({
       setSelectedPresetId(id)
       setUseCustom(false)
       setIsEditing(false)
-      try { localStorage.setItem(SETTINGS_SELECTED_KEY, id) } catch { /* ignore */ }
     }
   }, [onSettingsChange])
 
@@ -121,12 +112,10 @@ export const SettingsManager: FunctionComponent<Props> = ({
     const autosave = presets.find(p => p.name === AUTOSAVE_NAME && !p.builtIn)
     if (autosave) {
       setSelectedPresetId(autosave.id)
-      try { localStorage.setItem(SETTINGS_SELECTED_KEY, autosave.id) } catch { /* ignore */ }
     } else {
       const saved = saveSettingsPreset(AUTOSAVE_NAME, overrideSettings ?? settings)
       refreshPresets()
       setSelectedPresetId(saved.id)
-      try { localStorage.setItem(SETTINGS_SELECTED_KEY, saved.id) } catch { /* ignore */ }
     }
     if (!isEditing) setIsEditing(true)
   }, [presets, selectedPresetId, settings, refreshPresets, isEditing])
@@ -153,7 +142,6 @@ export const SettingsManager: FunctionComponent<Props> = ({
     refreshPresets()
     setSelectedPresetId(saved.id)
     setIsEditing(false)
-    try { localStorage.setItem(SETTINGS_SELECTED_KEY, saved.id) } catch { /* ignore */ }
   }, [isEditing, settings, refreshPresets, presets, selectedPresetId])
 
   // Wire up the early ref
@@ -197,7 +185,6 @@ export const SettingsManager: FunctionComponent<Props> = ({
     refreshPresets()
     setSelectedPresetId(saved.id)
     setUseCustom(false)
-    try { localStorage.setItem(SETTINGS_SELECTED_KEY, saved.id) } catch { /* ignore */ }
     setSaveName('')
     setShowSaveDialog(false)
   }, [saveName, settings, refreshPresets, stopAutosaveInterval])
@@ -215,7 +202,6 @@ export const SettingsManager: FunctionComponent<Props> = ({
     if (selectedPresetId === selectedPreset.id) {
       setSelectedPresetId('default')
       setIsEditing(false)
-      try { localStorage.setItem(SETTINGS_SELECTED_KEY, 'default') } catch { /* ignore */ }
       const defaultPreset = getSettingsPreset('default')
       if (defaultPreset) onSettingsChange({ ...defaultPreset.settings })
     }

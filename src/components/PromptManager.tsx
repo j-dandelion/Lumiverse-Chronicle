@@ -3,6 +3,7 @@
  */
 import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks'
 import type { FunctionComponent } from 'preact'
+import { usePersistedState } from '../hooks'
 import { getAllPresets, getPreset, savePreset, updatePreset, findPresetByName, deletePreset, exportPresets, importPresets, getOldFormatPresets, DEFAULT_PARAMS, type PromptPreset } from '../presets'
 import type { GenerationParams } from '../types'
 
@@ -12,8 +13,6 @@ interface Props {
   loading?: boolean
 }
 
-const PROMPT_SELECTED_KEY = 'chronicle_selected_prompt_preset'
-
 export const PromptManager: FunctionComponent<Props> = ({
   onActivePromptChange,
   onParamsChange,
@@ -22,16 +21,9 @@ export const PromptManager: FunctionComponent<Props> = ({
   const [presets, setPresets] = useState<PromptPreset[]>([])
   const [params, setParams] = useState<GenerationParams>({ ...DEFAULT_PARAMS })
 
-  // Restore last-selected preset from localStorage
-  const restoreSelectedPreset = (): string => {
-    try {
-      const saved = localStorage.getItem(PROMPT_SELECTED_KEY)
-      if (saved && getAllPresets().some((p) => p.id === saved)) return saved
-    } catch { /* ignore */ }
-    return 'default'
-  }
-
-  const [selectedPresetId, setSelectedPresetId] = useState<string>(restoreSelectedPreset)
+  const [selectedPresetId, setSelectedPresetId] = usePersistedState<string>(
+    'chronicle_selected_prompt_preset', 'default'
+  )
   const [useCustom, setUseCustom] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [customPrompt, setCustomPrompt] = useState('')
@@ -105,7 +97,6 @@ export const PromptManager: FunctionComponent<Props> = ({
     const localAutosave = findPresetByName(AUTOSAVE_NAME)
     if (localAutosave) {
       setSelectedPresetId(localAutosave.id)
-      try { localStorage.setItem(PROMPT_SELECTED_KEY, localAutosave.id) } catch { /* ignore */ }
       // Immediately load stored params so doAutosave (fired by isEditing effect) doesn't
       // overwrite with the stale closure's DEFAULT_PARAMS before this effect runs.
       if (localAutosave.params) setParams({ ...localAutosave.params })
@@ -113,7 +104,6 @@ export const PromptManager: FunctionComponent<Props> = ({
       const saved = savePreset(AUTOSAVE_NAME, promptOverride ?? (customPrompt || currentPreset?.systemPrompt || ''), params)
       refreshPresets()
       setSelectedPresetId(saved.id)
-      try { localStorage.setItem(PROMPT_SELECTED_KEY, saved.id) } catch { /* ignore */ }
     }
     if (!isEditing) setIsEditing(true)
   }, [presets, selectedPresetId, customPrompt, params, refreshPresets, isEditing])
@@ -145,7 +135,6 @@ export const PromptManager: FunctionComponent<Props> = ({
     refreshPresets()
     setSelectedPresetId(saved.id)
     setIsEditing(false)
-    try { localStorage.setItem(PROMPT_SELECTED_KEY, saved.id) } catch { /* ignore */ }
   }, [isEditing, customPrompt, params, refreshPresets, presets, selectedPresetId])
 
   // Ref to latest doAutosave so interval callbacks never go stale
@@ -203,8 +192,6 @@ export const PromptManager: FunctionComponent<Props> = ({
       setUseCustom(false)
       setIsEditing(false)
       setCustomPrompt('')
-      try { localStorage.setItem(PROMPT_SELECTED_KEY, id) } catch { /* ignore */ }
-
       // Immediately load the preset's params to avoid the stale-closure effect race:
       // the [isEditing, customPrompt] effect fires doAutosave before the
       // [selectedPresetId, useCustom] effect loads correct params.
@@ -228,8 +215,6 @@ export const PromptManager: FunctionComponent<Props> = ({
     refreshPresets()
     setSelectedPresetId(saved.id)
     setUseCustom(false)
-    // Persist selection so we switch to it
-    try { localStorage.setItem(PROMPT_SELECTED_KEY, saved.id) } catch { /* ignore */ }
     setSaveName('')
     setShowSaveDialog(false)
   }, [saveName, activePrompt, params, refreshPresets, stopAutosaveInterval])
@@ -246,7 +231,6 @@ export const PromptManager: FunctionComponent<Props> = ({
       setSelectedPresetId('default')
       setIsEditing(false)
       setCustomPrompt('')
-      try { localStorage.setItem(PROMPT_SELECTED_KEY, 'default') } catch { /* ignore */ }
     }
     setShowDeleteConfirm(false)
   }, [selectedPreset, selectedPresetId, refreshPresets])
