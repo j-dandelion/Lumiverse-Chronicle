@@ -41,7 +41,6 @@ import type {
 import {
   buildSummarizePrompt,
   parseSummaryJson,
-  sanitizeJsonForParse,
   extractContentKeywords,
 } from './prompts'
 
