@@ -115,103 +115,21 @@ export function setup(spindleCtx: SpindleFrontendContext) {
   // ── Helper: get selected message IDs (delegated to select-mode) ──
   // See select-mode.ts for the implementation
 
-  // ── Modal Shell (Escape dismiss wrapper) ────────────────────────
+  // ── Shared modal helper ─────────────────────────────────────────
 
-  function ChronicleModalShell({ count, onClose, onGenerateStart }: {
+  interface ModalConfig {
+    title: string
     count: number
-    onClose: () => void
-    onGenerateStart: (params: {
-      customPrompt: string | undefined
-      connectionId: string | undefined
-      lorebookId: string | undefined
-      entrySettings: EntrySettings
-      activePrompt: string | undefined
-      generationParams?: GenerationParams
-    }) => void
-  }) {
-    useEffect(() => {
-      const handler = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') onClose()
-      }
-      window.addEventListener('keydown', handler)
-      return () => window.removeEventListener('keydown', handler)
-    }, [onClose])
-
-    return <SummarizeFlow selectedCount={count} onRequestClose={onClose} onGenerateStart={onGenerateStart} />
+    preview?: SummarizePreview | null
+    boundaryName: string
   }
 
-  function openChronicleModal(count: number) {
-    if (count === 0) return
-    if (!spindleCtx) return
-    if (_modalOpen || _generating) return  // Guard against double-open + generating
-
-    const maxH = Math.min(720, window.innerHeight - 200)
-    const modal = spindleCtx.ui.showModal({
-      title: 'Create Summary / Memory',
-      width: 600,
-      maxHeight: maxH,
-    })
-
-    const handleGenerateStart = (params: {
-      customPrompt: string | undefined
-      connectionId: string | undefined
-      lorebookId: string | undefined
-      entrySettings: EntrySettings
-      activePrompt: string | undefined
-      generationParams?: GenerationParams
-    }) => {
-      startGenerating()
-      _generationSelectedCount = count
-      _generationEntrySettings = params.entrySettings
-      _generationLorebookId = params.lorebookId
-      _generationActivePrompt = params.activePrompt
-      _generationConnectionId = params.connectionId
-      _generationParams = params.generationParams
-      showSummaryToast('generating', 'Generating summary\u2026')
-      modal.dismiss()
-    }
-
-    _modalOpen = true
-
-    render(
-      <ChronicleContext.Provider value={spindleCtx}>
-        <ErrorBoundary name="modal">
-          <ChronicleModalShell count={count} onClose={() => modal.dismiss()} onGenerateStart={handleGenerateStart} />
-        </ErrorBoundary>
-      </ChronicleContext.Provider>,
-      modal.root
-    )
-
-    const dismissAndRelease = () => {
-      render(null as any, modal.root)
-      _modalOpen = false
-      if (_modalSafetyTimer) { clearTimeout(_modalSafetyTimer); _modalSafetyTimer = null }
-    }
-
-    modal.onDismiss(dismissAndRelease)
-
-    // Clear any stale safety timer from a previous modal before setting a new one
-    if (_modalSafetyTimer) { clearTimeout(_modalSafetyTimer); _modalSafetyTimer = null }
-    // Safety timeout: if onDismiss never fires (abnormal teardown), release after 60s
-    _modalSafetyTimer = setTimeout(() => {
-      _modalOpen = false
-      _modalSafetyTimer = null
-    }, 60_000)
-  }
-
-  // Expose for SummarizeButton (module-level ref, not globalThis)
-  _openModal = openChronicleModal
-
-  function openPreviewModal(previewData: SummarizePreview, count: number) {
+  function openModal({ title, count, preview, boundaryName }: ModalConfig) {
     if (!spindleCtx) return
     if (_modalOpen) return
 
     const maxH = Math.min(720, window.innerHeight - 200)
-    const modal = spindleCtx.ui.showModal({
-      title: `Lorebook Entry Preview (${count} ${count === 1 ? 'message' : 'messages'})`,
-      width: 600,
-      maxHeight: maxH,
-    })
+    const modal = spindleCtx.ui.showModal({ title, width: 600, maxHeight: maxH })
 
     const handleGenerateStart = (params: {
       customPrompt: string | undefined
@@ -233,23 +151,23 @@ export function setup(spindleCtx: SpindleFrontendContext) {
     }
 
     _modalOpen = true
-
-    // Clear any stale safety timer from a previous modal before setting a new one
     if (_modalSafetyTimer) { clearTimeout(_modalSafetyTimer); _modalSafetyTimer = null }
 
     render(
       <ChronicleContext.Provider value={spindleCtx}>
-        <ErrorBoundary name="preview-modal">
+        <ErrorBoundary name={boundaryName}>
           <SummarizeFlow
             selectedCount={count}
-            preview={previewData}
-            entrySettings={_generationEntrySettings}
-            lorebookId={_generationLorebookId}
-            initialActivePrompt={_generationActivePrompt}
-            initialConnectionId={_generationConnectionId}
-            initialGenerationParams={_generationParams}
             onRequestClose={() => modal.dismiss()}
             onGenerateStart={handleGenerateStart}
+            {...(preview ? {
+              preview,
+              entrySettings: _generationEntrySettings,
+              lorebookId: _generationLorebookId,
+              initialActivePrompt: _generationActivePrompt,
+              initialConnectionId: _generationConnectionId,
+              initialGenerationParams: _generationParams,
+            } : {})}
           />
         </ErrorBoundary>
       </ChronicleContext.Provider>,
@@ -261,12 +179,32 @@ export function setup(spindleCtx: SpindleFrontendContext) {
       _modalOpen = false
       if (_modalSafetyTimer) { clearTimeout(_modalSafetyTimer); _modalSafetyTimer = null }
     }
-
     modal.onDismiss(dismissAndRelease)
     _modalSafetyTimer = setTimeout(() => {
       _modalOpen = false
       _modalSafetyTimer = null
     }, 60_000)
+  }
+
+  function openChronicleModal(count: number) {
+    if (count === 0 || _generating) return
+    openModal({
+      title: 'Create Summary / Memory',
+      count,
+      boundaryName: 'modal',
+    })
+  }
+
+  // Expose for SummarizeButton (module-level ref, not globalThis)
+  _openModal = openChronicleModal
+
+  function openPreviewModal(previewData: SummarizePreview, count: number) {
+    openModal({
+      title: `Lorebook Entry Preview (${count} ${count === 1 ? 'message' : 'messages'})`,
+      count,
+      preview: previewData,
+      boundaryName: 'preview-modal',
+    })
   }
 
   // ── Select mode handlers ─────────────────────────────────────────
