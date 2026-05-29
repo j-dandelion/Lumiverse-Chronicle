@@ -308,6 +308,60 @@ export function parseSummaryJson(
     }
   }
 
+  // Strategy 4: Inline brace-matching — find "content" field, scan backwards for {,
+  // then forward for matching }. Handles malformed JSON where brace-extraction missed.
+  const contentKeyMatch = trimmed.match(/"content"\s*:\s*"/)
+  if (contentKeyMatch && contentKeyMatch.index !== undefined) {
+    let braceStart = -1
+    let inStr = false
+    for (let k = 0; k < contentKeyMatch.index; k++) {
+      if (trimmed[k] === '\\') { k++; continue }
+      if (trimmed[k] === '"') { inStr = !inStr; continue }
+      if (!inStr && trimmed[k] === '{') { braceStart = k }
+    }
+    if (braceStart !== -1) {
+      let depth = 0
+      let braceEnd = -1
+      for (let i = braceStart; i < trimmed.length; i++) {
+        if (trimmed[i] === '{') depth++
+        else if (trimmed[i] === '}') {
+          depth--
+          if (depth === 0) { braceEnd = i + 1; break }
+        }
+      }
+      if (braceEnd > braceStart) {
+        const result4 = tryParseSummaryJson(trimmed.slice(braceStart, braceEnd))
+        if (result4) return result4
+      }
+    }
+  }
+
+  // Strategy 5: Content-field string scan — extract the value of "content" from
+  // any JSON-like text by tracking backslash escapes to find the matching closing quote.
+  if (contentKeyMatch && contentKeyMatch.index !== undefined) {
+    const start = contentKeyMatch.index + contentKeyMatch[0].length
+    let j = start
+    while (j < trimmed.length) {
+      if (trimmed[j] === '\\') { j += 2; continue }
+      if (trimmed[j] === '"') {
+        let prose = trimmed.slice(start, j)
+          .replace(/\\n/g, '\n').replace(/\\r/g, '\r')
+          .replace(/\\t/g, '\t').replace(/\\"/g, '"').replace(/\\\\/g, '\\')
+          .trim()
+        if (prose) {
+          const titleMatch = trimmed.match(/"title"\s*:\s*"([^"]*)"/)
+          return {
+            title: titleMatch?.[1] || 'Untitled Entry',
+            keys: extractContentKeywords(prose, titleMatch?.[1] || ''),
+            content: prose,
+          }
+        }
+        break
+      }
+      j++
+    }
+  }
+
   // Truncation signal
   if (looksTruncated) {
     console.warn('[Chronicle] LLM response may be truncated (no closing brace).')
