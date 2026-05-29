@@ -37,7 +37,6 @@ export function observeSelectMode(
     for (const m of mutations) {
       if (m.type === 'attributes' && m.attributeName === 'data-select-mode') {
         const el = m.target as Element
-        console.log('[Chronicle] data-select-mode changed:', el.hasAttribute('data-select-mode'), el)
         if (el.hasAttribute('data-select-mode')) {
           onActivate()
         } else {

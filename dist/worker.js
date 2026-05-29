@@ -30,6 +30,48 @@ function isValidListLorebooksRequest(payload) {
   return payload.type === "list_lorebooks";
 }
 
+// src/worker-state.ts
+var SUMMARIZE_TIMEOUT_MS = 5 * 60 * 1000;
+var _summarizingUsers = new Set;
+var _summarizingTimeouts = new Map;
+var _pendingSummaries = new Map;
+var PENDING_TTL = 30 * 60 * 1000;
+function isSummarizing(userId) {
+  return _summarizingUsers.has(userId);
+}
+function startSummarizing(userId) {
+  _summarizingUsers.add(userId);
+}
+function stopSummarizing(userId) {
+  _summarizingUsers.delete(userId);
+  const t = _summarizingTimeouts.get(userId);
+  if (t) {
+    clearTimeout(t);
+    _summarizingTimeouts.delete(userId);
+  }
+}
+function setSummarizeTimeout(userId, timeoutId) {
+  _summarizingTimeouts.set(userId, timeoutId);
+}
+function getPendingSummary(requestId) {
+  return _pendingSummaries.get(requestId);
+}
+function setPendingSummary(requestId, pending) {
+  _pendingSummaries.set(requestId, pending);
+}
+function deletePendingSummary(requestId) {
+  _pendingSummaries.delete(requestId);
+}
+setInterval(() => {
+  const now = Date.now();
+  for (const [id, pending] of _pendingSummaries) {
+    if (now - pending.createdAt > PENDING_TTL) {
+      _pendingSummaries.delete(id);
+      spindle.log.info(`[Chronicle:Worker] Expired pending summary ${id}`);
+    }
+  }
+}, 60 * 1000);
+
 // src/prompts.ts
 var SUMMARIZE_SYSTEM_PROMPT = `<> Your task: Analyze the given story/roleplay and return a past-tense summary/breakdown in JSON format. The JSON must include three fields: title, content, and keywords. The JSON should be your only output.
 
@@ -217,8 +259,6 @@ var KEYWORD_STOP_WORDS = new Set([
   "much",
   "each",
   "other",
-  "before",
-  "after",
   "above",
   "below",
   "upon",
@@ -232,9 +272,7 @@ var KEYWORD_STOP_WORDS = new Set([
   "beyond",
   "inside",
   "outside",
-  "beneath",
   "within",
-  "without",
   "little",
   "enough",
   "every",
@@ -252,11 +290,7 @@ var KEYWORD_STOP_WORDS = new Set([
   "whomever",
   "whose",
   "whom",
-  "who",
-  "which",
-  "that",
-  "these",
-  "those"
+  "who"
 ]);
 function extractContentKeywords(content, title) {
   const text = `${title} ${content}`.toLowerCase();
@@ -315,6 +349,68 @@ function parseSummaryJson(text) {
         return result3;
     }
   }
+  const contentKeyMatch = trimmed.match(/"content"\s*:\s*"/);
+  if (contentKeyMatch && contentKeyMatch.index !== undefined) {
+    let braceStart = -1;
+    let inStr = false;
+    for (let k = 0;k < contentKeyMatch.index; k++) {
+      if (trimmed[k] === "\\") {
+        k++;
+        continue;
+      }
+      if (trimmed[k] === '"') {
+        inStr = !inStr;
+        continue;
+      }
+      if (!inStr && trimmed[k] === "{") {
+        braceStart = k;
+      }
+    }
+    if (braceStart !== -1) {
+      let depth = 0;
+      let braceEnd = -1;
+      for (let i = braceStart;i < trimmed.length; i++) {
+        if (trimmed[i] === "{")
+          depth++;
+        else if (trimmed[i] === "}") {
+          depth--;
+          if (depth === 0) {
+            braceEnd = i + 1;
+            break;
+          }
+        }
+      }
+      if (braceEnd > braceStart) {
+        const result4 = tryParseSummaryJson(trimmed.slice(braceStart, braceEnd));
+        if (result4)
+          return result4;
+      }
+    }
+  }
+  if (contentKeyMatch && contentKeyMatch.index !== undefined) {
+    const start = contentKeyMatch.index + contentKeyMatch[0].length;
+    let j = start;
+    while (j < trimmed.length) {
+      if (trimmed[j] === "\\") {
+        j += 2;
+        continue;
+      }
+      if (trimmed[j] === '"') {
+        let prose = trimmed.slice(start, j).replace(/\\n/g, `
+`).replace(/\\r/g, "\r").replace(/\\t/g, "\t").replace(/\\"/g, '"').replace(/\\\\/g, "\\").trim();
+        if (prose) {
+          const titleMatch = trimmed.match(/"title"\s*:\s*"([^"]*)"/);
+          return {
+            title: titleMatch?.[1] || "Untitled Entry",
+            keys: extractContentKeywords(prose, titleMatch?.[1] || ""),
+            content: prose
+          };
+        }
+        break;
+      }
+      j++;
+    }
+  }
   if (looksTruncated) {
     console.warn("[Chronicle] LLM response may be truncated (no closing brace).");
   }
@@ -342,22 +438,7 @@ function validateSummaryJson(obj) {
   };
 }
 
-// src/worker.ts
-var LOG = "[Chronicle:Worker]";
-var _summarizingUsers = new Set;
-var _summarizingTimeouts = new Map;
-var SUMMARIZE_TIMEOUT_MS = 5 * 60 * 1000;
-var _pendingSummaries = new Map;
-var PENDING_TTL = 30 * 60 * 1000;
-setInterval(() => {
-  const now = Date.now();
-  for (const [id, pending] of _pendingSummaries) {
-    if (now - pending.createdAt > PENDING_TTL) {
-      _pendingSummaries.delete(id);
-      spindle.log.info(`${LOG} Expired pending summary ${id}`);
-    }
-  }
-}, 60 * 1000);
+// src/worker-llm.ts
 function checkPermissions() {
   if (!spindle.permissions.has("generation"))
     return "generation";
@@ -394,20 +475,18 @@ async function generateSummary(messages, title, userId, customPrompt, connection
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt }
       ],
-      signal: AbortSignal.timeout(120000)
+      signal: AbortSignal.timeout(120000),
+      userId,
+      ...connectionId ? { connection_id: connectionId } : {},
+      ...params ? {
+        parameters: {
+          temperature: params.temperature,
+          top_p: params.top_p,
+          max_tokens: params.max_tokens,
+          top_k: params.top_k
+        }
+      } : {}
     };
-    genInput.userId = userId;
-    if (connectionId) {
-      genInput.connection_id = connectionId;
-    }
-    if (params) {
-      genInput.parameters = {
-        temperature: params.temperature,
-        top_p: params.top_p,
-        max_tokens: params.max_tokens,
-        top_k: params.top_k
-      };
-    }
     const result = await spindle.generate.quiet(genInput);
     const text = result?.content ?? "";
     if (!text?.trim()) {
@@ -422,84 +501,10 @@ async function generateSummary(messages, title, userId, customPrompt, connection
         keys
       };
     }
-    const rawText = text.trim();
-    const contentKeyMatch = rawText.match(/"content"\s*:\s*"/);
-    if (contentKeyMatch && contentKeyMatch.index !== undefined) {
-      let braceStart = -1;
-      let inStr = false;
-      for (let k = 0;k < contentKeyMatch.index; k++) {
-        if (rawText[k] === "\\") {
-          k++;
-          continue;
-        }
-        if (rawText[k] === '"') {
-          inStr = !inStr;
-          continue;
-        }
-        if (!inStr && rawText[k] === "{") {
-          braceStart = k;
-        }
-      }
-      if (braceStart !== -1) {
-        let depth = 0;
-        let braceEnd = -1;
-        for (let i = braceStart;i < rawText.length; i++) {
-          if (rawText[i] === "{")
-            depth++;
-          else if (rawText[i] === "}") {
-            depth--;
-            if (depth === 0) {
-              braceEnd = i + 1;
-              break;
-            }
-          }
-        }
-        if (braceEnd > braceStart) {
-          try {
-            const sanitized = sanitizeJsonForParse(rawText.slice(braceStart, braceEnd));
-            const obj = JSON.parse(sanitized);
-            if (obj && typeof obj === "object" && typeof obj.content === "string") {
-              const rawKeys = obj.keys ?? obj.keywords ?? obj.key ?? obj.tags ?? obj.keyword_list ?? obj.keywords_list;
-              const extractedKeys = Array.isArray(rawKeys) ? rawKeys : [];
-              return {
-                title: typeof obj.title === "string" ? obj.title : title || `Summary ${new Date().toLocaleDateString()}`,
-                content: obj.content,
-                keys: extractedKeys.length > 0 ? extractedKeys : extractContentKeywords(obj.content, obj.title || "")
-              };
-            }
-          } catch {}
-        }
-      }
-    }
-    const contentMatch = rawText.match(/"content"\s*:\s*"/);
-    if (contentMatch && contentMatch.index !== undefined) {
-      const start = contentMatch.index + contentMatch[0].length;
-      let j = start;
-      while (j < rawText.length) {
-        if (rawText[j] === "\\") {
-          j += 2;
-          continue;
-        }
-        if (rawText[j] === '"') {
-          let prose = rawText.slice(start, j).replace(/\\n/g, `
-`).replace(/\\r/g, "\r").replace(/\\t/g, "\t").replace(/\\"/g, '"').replace(/\\\\/g, "\\").trim();
-          if (prose) {
-            const titleMatch = rawText.match(/"title"\s*:\s*"([^"]*)"/);
-            return {
-              title: (titleMatch ? titleMatch[1] : undefined) || title || `Summary ${new Date().toLocaleDateString()}`,
-              content: prose,
-              keys: extractContentKeywords(prose, title || "")
-            };
-          }
-          break;
-        }
-        j++;
-      }
-    }
     return {
       title: title || `Summary ${new Date().toLocaleDateString()}`,
-      content: rawText,
-      keys: extractContentKeywords(rawText, title || "")
+      content: text.trim(),
+      keys: extractContentKeywords(text.trim(), title || "")
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -536,6 +541,141 @@ async function generateSummary(messages, title, userId, customPrompt, connection
     return null;
   }
 }
+
+// src/timeout.ts
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} timed out after ${ms / 1000}s`)), ms))
+  ]);
+}
+
+// src/worker-worldbooks.ts
+var LOG = "[Chronicle:Worker]";
+var CHRONICLE_WORLD_BOOK_NAME = "Chronicle";
+var _creationLocks = new Map;
+async function findOrCreateBook(matchName, description, userId) {
+  const key = `chronicle:book:${matchName}:${userId}`;
+  const existing = _creationLocks.get(key);
+  if (existing)
+    return existing;
+  const promise = (async () => {
+    const { data: books } = await withTimeout(spindle.world_books.list({ limit: 200, userId }), 1e4, "Listing world books");
+    const allBooks = books;
+    const found = allBooks.find((b) => b.name === matchName);
+    if (found)
+      return { id: found.id };
+    const newBook = await withTimeout(spindle.world_books.create({ name: matchName, description }, userId), 1e4, "Creating world book");
+    spindle.log.info(`${LOG} Created world book: ${matchName} (${newBook.id})`);
+    return { id: newBook.id };
+  })();
+  _creationLocks.set(key, promise);
+  const safetyTimeout = setTimeout(() => _creationLocks.delete(key), 30000);
+  try {
+    return await promise;
+  } finally {
+    clearTimeout(safetyTimeout);
+    _creationLocks.delete(key);
+  }
+}
+async function getOrCreateChronicleBook(userId) {
+  return findOrCreateBook(CHRONICLE_WORLD_BOOK_NAME, "Lorebook entries generated by the Chronicle extension", userId);
+}
+async function autoGenerateChronicleBook(userId) {
+  const { data: books } = await withTimeout(spindle.world_books.list({ limit: 200, userId }), 1e4, "Auto-generate lorebook list");
+  const allBooks = books;
+  const chronicleNumbers = allBooks.map((b) => b.name.match(/^Chronicle_(\d+)$/)).filter((m) => m !== null).map((m) => parseInt(m[1], 10)).sort((a, b) => a - b);
+  const nextN = chronicleNumbers.length > 0 ? chronicleNumbers[chronicleNumbers.length - 1] + 1 : 1;
+  const bookName = `Chronicle_${nextN}`;
+  return findOrCreateBook(bookName, `Auto-generated Chronicle lorebook #${nextN}`, userId);
+}
+async function resolveNextChronicleNumber(worldBookId, userId) {
+  try {
+    const result = await spindle.world_books.entries.list(worldBookId, {
+      limit: 500,
+      userId
+    });
+    let maxNum = 0;
+    for (const entry of result.data) {
+      if (!entry.comment)
+        continue;
+      const match = entry.comment.match(/^(\d+)(?:\s*-)?/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxNum)
+          maxNum = num;
+      }
+    }
+    return String(maxNum + 1);
+  } catch (err) {
+    spindle.log.warn(`${LOG} resolveNextChronicleNumber failed: ${err}`);
+    return "1";
+  }
+}
+async function fetchRecentSummaries(worldBookId, userId, count = 3) {
+  try {
+    const result = await spindle.world_books.entries.list(worldBookId, {
+      limit: 500,
+      userId
+    });
+    if (!result.data.length)
+      return "";
+    const withNumbers = result.data.map((entry) => {
+      const numMatch = entry.comment?.match(/^(\d+)(?:\s*-)?/);
+      return {
+        entry,
+        sceneNum: numMatch ? parseInt(numMatch[1], 10) : 0
+      };
+    }).sort((a, b) => b.sceneNum - a.sceneNum).slice(0, count);
+    const summaries = withNumbers.map(({ entry, sceneNum }) => {
+      const sceneLabel = sceneNum > 0 ? `Scene ${sceneNum}` : "Entry";
+      const snippet = (entry.content ?? "").slice(0, 200).replace(/\n/g, " ");
+      return `${sceneLabel}: ${snippet}${entry.content && entry.content.length > 200 ? "\u2026" : ""}`;
+    });
+    return `
+
+<> Recent scene summaries (for continuity \u2014 the messages above follow these scenes):
+${summaries.map((s) => `- ${s}`).join(`
+`)}`;
+  } catch (err) {
+    spindle.log.warn(`${LOG} fetchRecentSummaries failed: ${err}`);
+    return "";
+  }
+}
+async function saveLorebookEntry(summary, chatId, messageIds, worldBookId, userId, entrySettings, titleFormat, sceneNumber) {
+  let targetBookId = worldBookId;
+  if (targetBookId === "__auto_generate__") {
+    const book = await autoGenerateChronicleBook(userId);
+    targetBookId = book.id;
+  }
+  if (!targetBookId) {
+    const book = await getOrCreateChronicleBook(userId);
+    targetBookId = book.id;
+  }
+  const entryInput = { ...entrySettings || {} };
+  entryInput.key = summary.keys && summary.keys.length > 0 ? summary.keys : [summary.title.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 50)];
+  entryInput.keysecondary = [];
+  entryInput.content = summary.content;
+  let displayName = summary.title;
+  if (titleFormat) {
+    let resolvedFormat = titleFormat;
+    if (titleFormat.includes("{number}")) {
+      const nextNum = sceneNumber ?? await resolveNextChronicleNumber(targetBookId, userId);
+      resolvedFormat = titleFormat.replace(/\{number\}/g, nextNum);
+    }
+    const now = new Date;
+    displayName = resolvedFormat.replace(/\{title\}/g, summary.title).replace(/\{date\}/g, now.toLocaleDateString()).replace(/\{time\}/g, now.toLocaleTimeString());
+  }
+  entryInput.comment = `${displayName} | Chronicle summary | Source: chat ${chatId}, ${messageIds.length} messages | ${new Date().toISOString()}`;
+  const entry = await spindle.world_books.entries.create(targetBookId, entryInput, userId);
+  return {
+    entryId: entry.id,
+    worldBookId: targetBookId
+  };
+}
+
+// src/worker.ts
+var LOG2 = "[Chronicle:Worker]";
 async function hideMessagesPriorTo(chatId, selectedMessageIds, userId, keepVisibleCount = 0) {
   try {
     const allMessages = await spindle.chat.getMessages(chatId);
@@ -555,13 +695,10 @@ async function hideMessagesPriorTo(chatId, selectedMessageIds, userId, keepVisib
     const idsToHide = allMessages.slice(0, hideBeforeIdx).map((m) => m.id);
     if (idsToHide.length === 0)
       return;
-    await Promise.race([
-      spindle.chat.setMessagesHidden(chatId, idsToHide, true),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("Hide messages request timed out")), 1e4))
-    ]);
-    spindle.log.info(`${LOG} Hid ${idsToHide.length} messages prior to selection (kept ${keepVisibleCount} visible)`);
+    await withTimeout(spindle.chat.setMessagesHidden(chatId, idsToHide, true), 1e4, "Hide messages request");
+    spindle.log.info(`${LOG2} Hid ${idsToHide.length} messages prior to selection (kept ${keepVisibleCount} visible)`);
   } catch (err) {
-    spindle.log.warn(`${LOG} Failed to hide prior messages: ${err instanceof Error ? err.message : String(err)}`);
+    spindle.log.warn(`${LOG2} Failed to hide prior messages: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 async function handleSummarizeV2(req, userId) {
@@ -659,7 +796,7 @@ async function handleSummarizeV2(req, userId) {
     return;
   if (req.previewOnly) {
     const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-    _pendingSummaries.set(requestId, {
+    setPendingSummary(requestId, {
       requestId,
       title: summary.title,
       content: summary.content,
@@ -685,7 +822,7 @@ async function handleSummarizeV2(req, userId) {
   }
 }
 async function handleSaveSummary(req, userId) {
-  const pending = _pendingSummaries.get(req.requestId);
+  const pending = getPendingSummary(req.requestId);
   if (!pending) {
     spindle.sendToFrontend({
       type: "summarize_failed",
@@ -696,7 +833,7 @@ async function handleSaveSummary(req, userId) {
     return;
   }
   if (pending.userId !== userId) {
-    spindle.log.warn(`${LOG} User ${userId} tried to save pending summary of user ${pending.userId}`);
+    spindle.log.warn(`${LOG2} User ${userId} tried to save pending summary of user ${pending.userId}`);
     return;
   }
   spindle.sendToFrontend({ type: "summarize_progress", stage: "saving" }, userId);
@@ -705,15 +842,12 @@ async function handleSaveSummary(req, userId) {
     const effectiveContent = req.content ?? pending.content;
     const targetBookId = req.lorebookId || pending.worldBookId;
     const effectiveKeys = req.keys !== undefined ? req.keys : pending.keys;
-    const saveResult = await Promise.race([
-      saveLorebookEntry({ title: effectiveTitle, content: effectiveContent, keys: effectiveKeys }, pending.chatId, pending.messageIds, targetBookId, userId, req.settings, req.titleFormat, pending.sceneNumber),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("Save request timed out after 15s")), 15000))
-    ]);
+    const saveResult = await withTimeout(saveLorebookEntry({ title: effectiveTitle, content: effectiveContent, keys: effectiveKeys }, pending.chatId, pending.messageIds, targetBookId, userId, req.settings, req.titleFormat, pending.sceneNumber), 15000, "Save request");
     const { entryId, worldBookId } = saveResult;
-    _pendingSummaries.delete(req.requestId);
+    deletePendingSummary(req.requestId);
     if (pending.autoHidePrior) {
       hideMessagesPriorTo(pending.chatId, pending.messageIds, userId, pending.keepVisibleCount ?? 0).catch((err) => {
-        spindle.log.warn(`${LOG} hideMessagesPriorTo failed: ${err}`);
+        spindle.log.warn(`${LOG2} hideMessagesPriorTo failed: ${err}`);
       });
     }
     spindle.sendToFrontend({
@@ -723,12 +857,12 @@ async function handleSaveSummary(req, userId) {
       preview: pending.content.slice(0, 100),
       worldBookId
     }, userId);
-    spindle.log.info(`${LOG} Saved preview as lorebook entry "${effectiveTitle}" (${pending.messageIds.length} messages)`);
+    spindle.log.info(`${LOG2} Saved preview as lorebook entry "${effectiveTitle}" (${pending.messageIds.length} messages)`);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     if (pending.autoHidePrior && message === "Save request timed out after 15s") {
       hideMessagesPriorTo(pending.chatId, pending.messageIds, userId, pending.keepVisibleCount ?? 0).catch((e) => {
-        spindle.log.warn(`${LOG} hideMessagesPriorTo (timeout fallback) failed: ${e}`);
+        spindle.log.warn(`${LOG2} hideMessagesPriorTo (timeout fallback) failed: ${e}`);
       });
     }
     spindle.sendToFrontend({
@@ -740,10 +874,10 @@ async function handleSaveSummary(req, userId) {
   }
 }
 async function handleDiscardSummary(req, userId) {
-  const pending = _pendingSummaries.get(req.requestId);
+  const pending = getPendingSummary(req.requestId);
   if (pending && pending.userId === userId) {
-    _pendingSummaries.delete(req.requestId);
-    spindle.log.info(`${LOG} User ${userId} discarded pending summary ${req.requestId}`);
+    deletePendingSummary(req.requestId);
+    spindle.log.info(`${LOG2} User ${userId} discarded pending summary ${req.requestId}`);
   }
   spindle.sendToFrontend({
     type: "discard_confirmed",
@@ -752,23 +886,17 @@ async function handleDiscardSummary(req, userId) {
 }
 async function handleListConnections(userId) {
   try {
-    const connections = await Promise.race([
-      spindle.connections.list(userId),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("Timed out after 10s")), 1e4))
-    ]);
+    const connections = await withTimeout(Promise.resolve(spindle.connections.list(userId)), 1e4, "Connections list");
     spindle.sendToFrontend({ type: "connections_list", connections }, userId);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    spindle.log.warn(`${LOG} Failed to list connections: ${message}`);
+    spindle.log.warn(`${LOG2} Failed to list connections: ${message}`);
     spindle.sendToFrontend({ type: "connections_list", connections: [] }, userId);
   }
 }
 async function handleListLorebooks(userId) {
   try {
-    const { data: books } = await Promise.race([
-      spindle.world_books.list({ limit: 200, userId }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("Lorebook list request timed out after 10s")), 1e4))
-    ]);
+    const { data: books } = await withTimeout(spindle.world_books.list({ limit: 200, userId }), 1e4, "Lorebook list request");
     const allBooks = books.map((b) => ({ id: b.id, name: b.name }));
     let chatLinked = null;
     try {
@@ -781,7 +909,7 @@ async function handleListLorebooks(userId) {
         }
       }
     } catch (err) {
-      spindle.log.warn(`${LOG} Failed to get persona-linked book: ${err}`);
+      spindle.log.warn(`${LOG2} Failed to get persona-linked book: ${err}`);
     }
     let characterLinked = null;
     try {
@@ -798,7 +926,7 @@ async function handleListLorebooks(userId) {
         }
       }
     } catch (err) {
-      spindle.log.warn(`${LOG} Failed to get character-linked book: ${err}`);
+      spindle.log.warn(`${LOG2} Failed to get character-linked book: ${err}`);
     }
     spindle.sendToFrontend({
       type: "lorebooks_list",
@@ -808,7 +936,7 @@ async function handleListLorebooks(userId) {
     }, userId);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    spindle.log.warn(`${LOG} Failed to list lorebooks: ${message}`);
+    spindle.log.warn(`${LOG2} Failed to list lorebooks: ${message}`);
     spindle.sendToFrontend({
       type: "lorebooks_list",
       chatLinked: null,
@@ -817,155 +945,8 @@ async function handleListLorebooks(userId) {
     }, userId);
   }
 }
-var CHRONICLE_WORLD_BOOK_NAME = "Chronicle";
-var _creationLocks = new Map;
-async function getOrCreateChronicleBook(userId) {
-  const key = `chronicle:${CHRONICLE_WORLD_BOOK_NAME}:${userId}`;
-  const existing = _creationLocks.get(key);
-  if (existing)
-    return existing;
-  const promise = (async () => {
-    const { data: books } = await Promise.race([
-      spindle.world_books.list({ limit: 200, userId }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("Timed out listing world books")), 1e4))
-    ]);
-    const allBooks = books;
-    const chronicleBook = allBooks.find((b) => b.name === CHRONICLE_WORLD_BOOK_NAME);
-    if (chronicleBook) {
-      return { id: chronicleBook.id };
-    }
-    const newBook = await Promise.race([
-      spindle.world_books.create({ name: CHRONICLE_WORLD_BOOK_NAME, description: "Lorebook entries generated by the Chronicle extension" }, userId),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("Timed out creating world book")), 1e4))
-    ]);
-    spindle.log.info(`${LOG} Created Chronicle world book: ${newBook.id}`);
-    return { id: newBook.id };
-  })();
-  _creationLocks.set(key, promise);
-  const safetyTimeout = setTimeout(() => _creationLocks.delete(key), 30000);
-  try {
-    return await promise;
-  } finally {
-    clearTimeout(safetyTimeout);
-    _creationLocks.delete(key);
-  }
-}
-async function autoGenerateChronicleBook(userId) {
-  const key = `chronicle:auto_generate:${userId}`;
-  const existing = _creationLocks.get(key);
-  if (existing)
-    return existing;
-  const promise = (async () => {
-    const { data: books } = await Promise.race([
-      spindle.world_books.list({ limit: 200, userId }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("Auto-generate lorebook list timed out")), 1e4))
-    ]);
-    const allBooks = books;
-    const chronicleNumbers = allBooks.map((b) => b.name.match(/^Chronicle_(\d+)$/)).filter((m) => m !== null).map((m) => parseInt(m[1], 10)).sort((a, b) => a - b);
-    const nextN = chronicleNumbers.length > 0 ? chronicleNumbers[chronicleNumbers.length - 1] + 1 : 1;
-    const bookName = `Chronicle_${nextN}`;
-    const newBook = await Promise.race([
-      spindle.world_books.create({ name: bookName, description: `Auto-generated Chronicle lorebook #${nextN}` }, userId),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("Timed out creating lorebook")), 1e4))
-    ]);
-    spindle.log.info(`${LOG} Auto-generated Chronicle book: ${bookName} (${newBook.id})`);
-    return { id: newBook.id };
-  })();
-  _creationLocks.set(key, promise);
-  const safetyTimeout = setTimeout(() => _creationLocks.delete(key), 30000);
-  try {
-    return await promise;
-  } finally {
-    clearTimeout(safetyTimeout);
-    _creationLocks.delete(key);
-  }
-}
-async function resolveNextChronicleNumber(worldBookId, userId) {
-  try {
-    const result = await spindle.world_books.entries.list(worldBookId, {
-      limit: 500,
-      userId
-    });
-    let maxNum = 0;
-    for (const entry of result.data) {
-      if (!entry.comment)
-        continue;
-      const match = entry.comment.match(/^(\d+)(?:\s*-)?/);
-      if (match) {
-        const num = parseInt(match[1], 10);
-        if (num > maxNum)
-          maxNum = num;
-      }
-    }
-    return String(maxNum + 1);
-  } catch (err) {
-    spindle.log.warn(`${LOG} resolveNextChronicleNumber failed: ${err}`);
-    return "1";
-  }
-}
-async function fetchRecentSummaries(worldBookId, userId, count = 3) {
-  try {
-    const result = await spindle.world_books.entries.list(worldBookId, {
-      limit: 500,
-      userId
-    });
-    if (!result.data.length)
-      return "";
-    const withNumbers = result.data.map((entry) => {
-      const numMatch = entry.comment?.match(/^(\d+)(?:\s*-)?/);
-      return {
-        entry,
-        sceneNum: numMatch ? parseInt(numMatch[1], 10) : 0
-      };
-    }).sort((a, b) => b.sceneNum - a.sceneNum).slice(0, count);
-    const summaries = withNumbers.map(({ entry, sceneNum }) => {
-      const sceneLabel = sceneNum > 0 ? `Scene ${sceneNum}` : "Entry";
-      const snippet = (entry.content ?? "").slice(0, 200).replace(/\n/g, " ");
-      return `${sceneLabel}: ${snippet}${entry.content && entry.content.length > 200 ? "\u2026" : ""}`;
-    });
-    return `
-
-<> Recent scene summaries (for continuity \u2014 the messages above follow these scenes):
-${summaries.map((s) => `- ${s}`).join(`
-`)}`;
-  } catch (err) {
-    spindle.log.warn(`${LOG} fetchRecentSummaries failed: ${err}`);
-    return "";
-  }
-}
-async function saveLorebookEntry(summary, chatId, messageIds, worldBookId, userId, entrySettings, titleFormat, sceneNumber) {
-  let targetBookId = worldBookId;
-  if (targetBookId === "__auto_generate__") {
-    const book = await autoGenerateChronicleBook(userId);
-    targetBookId = book.id;
-  }
-  if (!targetBookId) {
-    const book = await getOrCreateChronicleBook(userId);
-    targetBookId = book.id;
-  }
-  const entryInput = { ...entrySettings || {} };
-  entryInput.key = summary.keys && summary.keys.length > 0 ? summary.keys : [summary.title.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 50)];
-  entryInput.keysecondary = [];
-  entryInput.content = summary.content;
-  let displayName = summary.title;
-  if (titleFormat) {
-    let resolvedFormat = titleFormat;
-    if (titleFormat.includes("{number}")) {
-      const nextNum = sceneNumber ?? await resolveNextChronicleNumber(targetBookId, userId);
-      resolvedFormat = titleFormat.replace(/\{number\}/g, nextNum);
-    }
-    const now = new Date;
-    displayName = resolvedFormat.replace(/\{title\}/g, summary.title).replace(/\{date\}/g, now.toLocaleDateString()).replace(/\{time\}/g, now.toLocaleTimeString());
-  }
-  entryInput.comment = `${displayName} | Chronicle summary | Source: chat ${chatId}, ${messageIds.length} messages | ${new Date().toISOString()}`;
-  const entry = await spindle.world_books.entries.create(targetBookId, entryInput, userId);
-  return {
-    entryId: entry.id,
-    worldBookId: targetBookId
-  };
-}
 async function handleFrontendMessage(payload, userId) {
-  spindle.log.info(`${LOG} Received message: ` + JSON.stringify(payload));
+  spindle.log.info(`${LOG2} Received message: ` + JSON.stringify(payload));
   const raw = payload;
   if (raw?.type === "summarize_v2" && raw.protocolVersion !== PROTOCOL_VERSION) {
     spindle.sendToFrontend({
@@ -977,7 +958,7 @@ async function handleFrontendMessage(payload, userId) {
     return;
   }
   if (isValidSummarizeRequestV2(payload)) {
-    if (_summarizingUsers.has(userId)) {
+    if (isSummarizing(userId)) {
       spindle.sendToFrontend({
         type: "summarize_failed",
         error: "A summarization is already in progress for your account. Please wait.",
@@ -986,14 +967,13 @@ async function handleFrontendMessage(payload, userId) {
       }, userId);
       return;
     }
-    _summarizingUsers.add(userId);
+    startSummarizing(userId);
     let _summarizationCompleted = false;
     const timeoutId = setTimeout(() => {
       if (_summarizationCompleted)
         return;
-      _summarizingUsers.delete(userId);
-      _summarizingTimeouts.delete(userId);
-      spindle.log.warn(`${LOG} Summarization lock for ${userId} auto-cleared after ${SUMMARIZE_TIMEOUT_MS / 1000}s timeout`);
+      stopSummarizing(userId);
+      spindle.log.warn(`${LOG2} Summarization lock for ${userId} auto-cleared after ${SUMMARIZE_TIMEOUT_MS / 1000}s timeout`);
       spindle.sendToFrontend({
         type: "summarize_failed",
         error: "Summarization timed out after 5 minutes.",
@@ -1001,17 +981,12 @@ async function handleFrontendMessage(payload, userId) {
         retryable: true
       }, userId);
     }, SUMMARIZE_TIMEOUT_MS);
-    _summarizingTimeouts.set(userId, timeoutId);
+    setSummarizeTimeout(userId, timeoutId);
     try {
       await handleSummarizeV2(payload, userId);
     } finally {
       _summarizationCompleted = true;
-      const t = _summarizingTimeouts.get(userId);
-      if (t) {
-        clearTimeout(t);
-        _summarizingTimeouts.delete(userId);
-      }
-      _summarizingUsers.delete(userId);
+      stopSummarizing(userId);
     }
   } else if (isValidSaveSummaryRequest(payload)) {
     await handleSaveSummary(payload, userId);
@@ -1022,8 +997,8 @@ async function handleFrontendMessage(payload, userId) {
   } else if (isValidListLorebooksRequest(payload)) {
     await handleListLorebooks(userId);
   } else {
-    spindle.log.warn(`${LOG} Unknown or invalid message: ` + JSON.stringify(payload));
+    spindle.log.warn(`${LOG2} Unknown or invalid message: ` + JSON.stringify(payload));
   }
 }
 spindle.onFrontendMessage(handleFrontendMessage);
-spindle.log.info(`${LOG} Worker started \u2014 ready to summarize`);
+spindle.log.info(`${LOG2} Worker started \u2014 ready to summarize`);

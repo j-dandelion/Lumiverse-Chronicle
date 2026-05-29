@@ -104,17 +104,17 @@ export const SummarizeFlow: FunctionComponent<Props> = (props) => {
   )
   // Auto-hide settings (persisted to localStorage)
   const [autoHidePrior, setAutoHidePrior] = usePersistedState<boolean>(
-    'chronicle:autoHidePrior', true, String, v => v === 'true'
+    'chronicle_autoHidePrior', true, String, v => v === 'true'
   )
   const [keepVisibleCount, setKeepVisibleCount] = usePersistedState<number>(
-    'chronicle:keepVisibleCount', 10, String, v => Math.max(0, parseInt(v, 10) || 0)
+    'chronicle_keepVisibleCount', 10, String, v => Math.max(0, parseInt(v, 10) || 0)
   )
   // Recent context settings (persisted)
   const [includeRecentContext, setIncludeRecentContext] = usePersistedState<boolean>(
-    'chronicle:includeRecentContext', false, String, v => v === 'true'
+    'chronicle_includeRecentContext', false, String, v => v === 'true'
   )
   const [recentContextCount, setRecentContextCount] = usePersistedState<number>(
-    'chronicle:recentContextCount', 3, String, v => Math.max(1, Math.min(10, parseInt(v, 10) || 3))
+    'chronicle_recentContextCount', 3, String, v => Math.max(1, Math.min(10, parseInt(v, 10) || 3))
   )
   const [generationParams, setGenerationParams] = useState<GenerationParams>(
     initialGenerationParams ? { ...initialGenerationParams } : { ...DEFAULT_PARAMS }
@@ -122,11 +122,11 @@ export const SummarizeFlow: FunctionComponent<Props> = (props) => {
   // Title format template (persisted)
   const DEFAULT_TITLE_FORMAT = '{number} - {title}'
   const [titleFormat, setTitleFormat] = usePersistedState(
-    'chronicle:titleFormat', DEFAULT_TITLE_FORMAT
+    'chronicle_titleFormat', DEFAULT_TITLE_FORMAT
   )
   // Whether the user is in custom format mode (persisted boolean — NOT derived from value matching)
   const [useCustomFormat, setUseCustomFormat] = usePersistedState<boolean>(
-    'chronicle:useCustomTitleFormat', false, String, v => v === 'true'
+    'chronicle_useCustomTitleFormat', false, String, v => v === 'true'
   )
   const selectedFormatValue = useCustomFormat ? '__custom__' : titleFormat
   const previewDataRef = useRef<PreviewData | null>(previewProp ?? null)

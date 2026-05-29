@@ -77,18 +77,12 @@ function findSelectBar(): HTMLElement | null {
 
 export function injectIntoSelectBar(): { cleanup: () => void } | null {
   const bar = findSelectBar()
-
-  console.log('[Chronicle] Looking for MessageSelectBar:', bar?.tagName, (bar as HTMLElement)?.className)
-
   if (!bar) {
     console.warn('[Chronicle] MessageSelectBar not found')
     return null
   }
 
   const actions = bar.querySelector('[class*="actions"]') as HTMLElement | null
-
-  console.log('[Chronicle] Looking for .actions inside bar:', actions?.className)
-
   if (!actions) {
     const childClasses = Array.from(bar.children).map(c => (c as HTMLElement).className)
     console.warn('[Chronicle] .actions not found in bar. Children:', childClasses)

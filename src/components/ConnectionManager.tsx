@@ -28,7 +28,7 @@ export const ConnectionManager: FunctionComponent<Props> = ({
   const [selectedId, setSelectedId] = useState<string>(loadSelectedConnectionId)
   const [fetching, setFetching] = useState(true)
   const [hintDismissed, setHintDismissed] = useState<boolean>(() => {
-    try { return localStorage.getItem('chronicle:connHintDismissed') === 'true' } catch { return false }
+    try { return localStorage.getItem('chronicle_connHintDismissed') === 'true' } catch { return false }
   })
   const receivedRef = useRef(false)
   const ctx = useChronicleCtx()
@@ -90,7 +90,7 @@ export const ConnectionManager: FunctionComponent<Props> = ({
 
   const dismissHint = () => {
     setHintDismissed(true)
-    try { localStorage.setItem('chronicle:connHintDismissed', 'true') } catch {}
+    try { localStorage.setItem('chronicle_connHintDismissed', 'true') } catch {}
   }
 
   const isDisabled = loading || fetching

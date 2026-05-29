@@ -42,8 +42,6 @@ let _modalSafetyTimer: ReturnType<typeof setTimeout> | null = null
 // ── Setup ───────────────────────────────────────────────────────────
 
 export function setup(spindleCtx: SpindleFrontendContext) {
-  console.log('[Chronicle] Setup starting...')
-
   // Local state — no module-level mutable vars
   let _removeObserver: (() => void) | null = null
   let _removeStyles: (() => void) | null = null
@@ -210,7 +208,6 @@ export function setup(spindleCtx: SpindleFrontendContext) {
   // ── Select mode handlers ─────────────────────────────────────────
 
   function onSelectModeActivate() {
-    console.log('[Chronicle] Select mode activated')
     // Skip re-inject if our components are already mounted — this avoids
     // a race where setMessageSelectMode(true) fires the data-select-mode
     // observer, which would otherwise unmount + remount Chronicle components.
@@ -223,7 +220,6 @@ export function setup(spindleCtx: SpindleFrontendContext) {
   }
 
   function onSelectModeDeactivate() {
-    console.log('[Chronicle] Select mode deactivated')
     _selectBarCleanup?.cleanup()
     _selectBarCleanup = null
   }
@@ -277,13 +273,9 @@ export function setup(spindleCtx: SpindleFrontendContext) {
   const fullTeardown = createFullTeardown(teardownState)
   teardownState._teardownRef.current = fullTeardown
   _activeTeardown = fullTeardown
-
-  console.log('[Chronicle] Setup complete')
 }
 
 export function teardown() {
-  console.log('[Chronicle] Teardown requested')
-
   // Prefer the tracked cleanup path
   if (_activeTeardown) {
     _activeTeardown()

@@ -496,16 +496,9 @@ function useChronicleCtx() {
   return x2(ChronicleContext);
 }
 
-// src/styles.ts
-function injectStyles() {
-  const style = document.createElement("style");
-  style.setAttribute("data-chronicle", "styles");
-  style.textContent = getChronicleCSS();
-  document.head.appendChild(style);
-  return () => style.remove();
-}
-function getChronicleCSS() {
-  return `
+// src/styles/tokens.ts
+var tokensCSS = `
+
     /* ── Chronicle Design Tokens ────────────────────────── */
     :root {
       --chronicle-error-bg: rgba(239, 68, 68, 0.1);
@@ -514,6 +507,10 @@ function getChronicleCSS() {
       --chronicle-success-text: rgb(74, 222, 128);
       --chronicle-overlay-bg: rgba(0, 0, 0, 0.5);
     }
+`;
+
+// src/styles/button.ts
+var buttonCSS = `
 
     /* ── Summarize Button ─────────────────────────────────── */
     [data-chronicle="summarize-btn"] {
@@ -552,6 +549,10 @@ function getChronicleCSS() {
     @keyframes chronicle-spin {
       to { transform: rotate(360deg); }
     }
+`;
+
+// src/styles/prompt.ts
+var promptCSS = `
 
     /* ── Prompt Manager ─────────────────────────────── */
     [data-chronicle="prompt-manager"] {
@@ -780,6 +781,10 @@ function getChronicleCSS() {
       border-color: var(--lumiverse-primary);
       color: var(--lumiverse-primary);
     }
+`;
+
+// src/styles/flow.ts
+var flowCSS = `
 
     /* ── Summarize Flow ──────────────────────────────── */
     [data-chronicle="summarize-flow"] { display: flex; flex-direction: column; gap: 12px; }
@@ -792,6 +797,10 @@ function getChronicleCSS() {
       font-weight: 500;
       text-align: center;
     }
+`;
+
+// src/styles/autohide.ts
+var autohideCSS = `
 
     /* ── Auto-hide controls ─────────────────────────────── */
     .chronicle-sf-autohide {
@@ -850,6 +859,10 @@ function getChronicleCSS() {
       opacity: 0.5;
       cursor: not-allowed;
     }
+`;
+
+// src/styles/tooltip.ts
+var tooltipCSS = `
 
     /* ── Info tooltip ──────────────────────────────────── */
     .chronicle-info-icon {
@@ -972,6 +985,10 @@ function getChronicleCSS() {
       align-items: center;
       justify-content: space-between;
     }
+`;
+
+// src/styles/settings.ts
+var settingsCSS = `
 
     /* ── Settings Manager ──────────────────────────── */
     [data-chronicle="settings-manager"] {
@@ -1189,6 +1206,10 @@ function getChronicleCSS() {
       border-color: var(--lumiverse-primary);
       color: var(--lumiverse-primary);
     }
+`;
+
+// src/styles/flow-keys.ts
+var flowKeysCSS = `
 
     /* ── Summarize Flow — Keys row ─────────────────── */
     .chronicle-sf-keys-row {
@@ -1217,6 +1238,10 @@ function getChronicleCSS() {
       opacity: 0.6;
       padding-left: 2px;
     }
+`;
+
+// src/styles/connection.ts
+var connectionCSS = `
 
     /* ── Connection Manager ──────────────────────── */
     [data-chronicle="connection-manager"] {
@@ -1250,6 +1275,10 @@ function getChronicleCSS() {
       opacity: 0.4;
       cursor: not-allowed;
     }
+`;
+
+// src/styles/connection-hint.ts
+var connectionHintCSS = `
 
     /* ── Connection Hint ──────────────────────────── */
     .chronicle-conn-hint {
@@ -1300,6 +1329,10 @@ function getChronicleCSS() {
       opacity: 1;
       color: var(--lumiverse-text);
     }
+`;
+
+// src/styles/connection-blink.ts
+var connectionBlinkCSS = `
 
     /* ── New Connection Button Blink ──────────────── */
     @keyframes chronicle-conn-blink {
@@ -1313,6 +1346,10 @@ function getChronicleCSS() {
     .chronicle-conn-highlight {
       animation: chronicle-conn-blink 2s ease-in-out 2;
     }
+`;
+
+// src/styles/lorebook.ts
+var lorebookCSS = `
 
     /* ── Lorebook Manager ──────────────────────────── */
     [data-chronicle="lorebook-manager"] {
@@ -1343,6 +1380,10 @@ function getChronicleCSS() {
       opacity: 0.4;
       cursor: not-allowed;
     }
+`;
+
+// src/styles/error-boundary.ts
+var errorBoundaryCSS = `
 
     /* ── Error boundary ─────────────────────────────────── */
     .chronicle-error-boundary {
@@ -1365,6 +1406,10 @@ function getChronicleCSS() {
       border-radius: 4px;
       cursor: pointer;
     }
+`;
+
+// src/styles/toast.ts
+var toastCSS = `
 
     /* ── Summary Generation Toast ─────────────────────── */
     .chronicle-toast {
@@ -1401,6 +1446,10 @@ function getChronicleCSS() {
       font-weight: 700;
       font-size: calc(14px * var(--lumiverse-font-scale, 1));
     }
+`;
+
+// src/styles/delete-confirmation.ts
+var deleteConfirmationCSS = `
 
     /* ── Delete Confirmation Popup ───────────────────── */
     .chronicle-dc-overlay {
@@ -1457,6 +1506,34 @@ function getChronicleCSS() {
     }
 
   `;
+
+// src/styles.ts
+var ALL_CSS = [
+  tokensCSS,
+  buttonCSS,
+  promptCSS,
+  flowCSS,
+  autohideCSS,
+  tooltipCSS,
+  settingsCSS,
+  flowKeysCSS,
+  connectionCSS,
+  connectionHintCSS,
+  connectionBlinkCSS,
+  lorebookCSS,
+  errorBoundaryCSS,
+  toastCSS,
+  deleteConfirmationCSS
+];
+function injectStyles() {
+  const style = document.createElement("style");
+  style.setAttribute("data-chronicle", "styles");
+  style.textContent = getChronicleCSS();
+  document.head.appendChild(style);
+  return () => style.remove();
+}
+function getChronicleCSS() {
+  return ALL_CSS.join("");
 }
 
 // src/select-mode.ts
@@ -1483,7 +1560,6 @@ function observeSelectMode(onActivate, onDeactivate) {
     for (const m3 of mutations) {
       if (m3.type === "attributes" && m3.attributeName === "data-select-mode") {
         const el = m3.target;
-        console.log("[Chronicle] data-select-mode changed:", el.hasAttribute("data-select-mode"), el);
         if (el.hasAttribute("data-select-mode")) {
           onActivate();
         } else {
@@ -1661,13 +1737,11 @@ function findSelectBar() {
 }
 function injectIntoSelectBar() {
   const bar = findSelectBar();
-  console.log("[Chronicle] Looking for MessageSelectBar:", bar?.tagName, bar?.className);
   if (!bar) {
     console.warn("[Chronicle] MessageSelectBar not found");
     return null;
   }
   const actions = bar.querySelector('[class*="actions"]');
-  console.log("[Chronicle] Looking for .actions inside bar:", actions?.className);
   if (!actions) {
     const childClasses = Array.from(bar.children).map((c3) => c3.className);
     console.warn("[Chronicle] .actions not found in bar. Children:", childClasses);
@@ -1744,6 +1818,202 @@ function createFullTeardown(state) {
     }
     state._renders.length = 0;
     state._teardownRef.current = null;
+  };
+}
+
+// src/usePresetManager.ts
+function usePresetManager(opts) {
+  const {
+    selectedKey,
+    loadAll,
+    save,
+    findByName,
+    deletePreset,
+    exportAll,
+    importAll,
+    autosaveName = "Autosave"
+  } = opts;
+  const [presets, setPresets] = d2([]);
+  const [selectedPresetId, setSelectedPresetId] = d2(() => {
+    try {
+      const saved = localStorage.getItem(selectedKey);
+      if (saved)
+        return saved;
+    } catch {}
+    return "default";
+  });
+  const [useCustom, setUseCustom] = d2(false);
+  const [isEditing, setIsEditing] = d2(false);
+  const [showSaveDialog, setShowSaveDialog] = d2(false);
+  const [saveName, setSaveName] = d2("");
+  const [importError, setImportError] = d2(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = d2(false);
+  const fileInputRef = A2(null);
+  const autosaveIntervalRef = A2(null);
+  const doAutosaveRef = A2(null);
+  y2(() => {
+    setPresets(loadAll());
+  }, []);
+  const refreshPresets = q2(() => {
+    setPresets(loadAll());
+  }, [loadAll]);
+  y2(() => {
+    try {
+      localStorage.setItem(selectedKey, selectedPresetId);
+    } catch {}
+  }, [selectedKey, selectedPresetId]);
+  const stopAutosaveInterval = q2(() => {
+    if (autosaveIntervalRef.current !== null) {
+      clearInterval(autosaveIntervalRef.current);
+      autosaveIntervalRef.current = null;
+    }
+  }, []);
+  const startAutosaveInterval = q2(() => {
+    stopAutosaveInterval();
+    autosaveIntervalRef.current = setInterval(() => doAutosaveRef.current?.(), 3000);
+  }, [stopAutosaveInterval]);
+  y2(() => {
+    return () => {
+      doAutosaveRef.current?.();
+      stopAutosaveInterval();
+    };
+  }, []);
+  y2(() => {
+    if (isEditing) {
+      doAutosaveRef.current?.();
+      startAutosaveInterval();
+    } else {
+      stopAutosaveInterval();
+    }
+  }, [isEditing]);
+  const applyPreset = q2((id) => {
+    if (id === "__custom__") {
+      setUseCustom(true);
+      return;
+    }
+    stopAutosaveInterval();
+    setSelectedPresetId(id);
+    setUseCustom(false);
+    setIsEditing(false);
+  }, [stopAutosaveInterval]);
+  const handlePresetChange = q2((e3) => {
+    const id = e3.target.value;
+    if (id === selectedPresetId && !useCustom)
+      return;
+    if (id === "__custom__") {
+      setUseCustom(true);
+    } else {
+      doAutosaveRef.current?.();
+      stopAutosaveInterval();
+      setSelectedPresetId(id);
+      setUseCustom(false);
+      setIsEditing(false);
+    }
+  }, [selectedPresetId, useCustom, stopAutosaveInterval]);
+  const selectedPreset = presets.find((p3) => p3.id === selectedPresetId);
+  const ensureAutosavePreset = q2(() => {
+    const currentPreset = presets.find((p3) => p3.id === selectedPresetId);
+    if (currentPreset && !currentPreset.builtIn) {
+      if (!isEditing)
+        setIsEditing(true);
+      return;
+    }
+    const existing = findByName(autosaveName);
+    if (existing) {
+      setSelectedPresetId(existing.id);
+    } else {
+      const saved = save(autosaveName);
+      refreshPresets();
+      setSelectedPresetId(saved.id);
+    }
+    if (!isEditing)
+      setIsEditing(true);
+  }, [presets, selectedPresetId, findByName, save, refreshPresets, isEditing, autosaveName]);
+  const handleDeleteClick = q2(() => {
+    setShowDeleteConfirm(true);
+  }, []);
+  const handleConfirmDelete = q2(() => {
+    if (!selectedPreset)
+      return;
+    deletePreset(selectedPreset.id);
+    refreshPresets();
+    if (selectedPresetId === selectedPreset.id) {
+      setSelectedPresetId("default");
+      setIsEditing(false);
+    }
+    setShowDeleteConfirm(false);
+  }, [selectedPreset, selectedPresetId, refreshPresets, deletePreset]);
+  const handleCancelDelete = q2(() => {
+    setShowDeleteConfirm(false);
+  }, []);
+  y2(() => {
+    if (showDeleteConfirm)
+      setShowDeleteConfirm(false);
+  }, [selectedPresetId]);
+  const handleExport = q2(() => {
+    const json = exportAll();
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a3 = document.createElement("a");
+    a3.href = url;
+    a3.download = `chronicle-presets-${new Date().toISOString().slice(0, 10)}.json`;
+    a3.click();
+    URL.revokeObjectURL(url);
+  }, [exportAll]);
+  const handleImportFile = q2((e3) => {
+    const input = e3.target;
+    const file = input.files?.[0];
+    if (!file)
+      return;
+    const reader = new FileReader;
+    reader.onload = () => {
+      const text = reader.result;
+      const result = importAll(text);
+      if (result.success) {
+        refreshPresets();
+        setImportError(null);
+      } else {
+        setImportError(result.error || "Import failed");
+      }
+    };
+    reader.readAsText(file);
+    input.value = "";
+  }, [importAll, refreshPresets]);
+  const handleTriggerImport = q2(() => {
+    fileInputRef.current?.click();
+  }, []);
+  return {
+    presets,
+    selectedPresetId,
+    setSelectedPresetId,
+    useCustom,
+    setUseCustom,
+    isEditing,
+    setIsEditing,
+    selectedPreset,
+    showSaveDialog,
+    setShowSaveDialog,
+    saveName,
+    setSaveName,
+    importError,
+    setImportError,
+    showDeleteConfirm,
+    setShowDeleteConfirm,
+    fileInputRef,
+    doAutosaveRef,
+    autosaveIntervalRef,
+    refreshPresets,
+    applyPreset,
+    handlePresetChange,
+    ensureAutosavePreset,
+    handleDeleteClick,
+    handleConfirmDelete,
+    handleCancelDelete,
+    handleExport,
+    handleImportFile,
+    handleTriggerImport,
+    stopAutosaveInterval,
+    startAutosaveInterval
   };
 }
 
@@ -1857,8 +2127,6 @@ var KEYWORD_STOP_WORDS = new Set([
   "much",
   "each",
   "other",
-  "before",
-  "after",
   "above",
   "below",
   "upon",
@@ -1872,9 +2140,7 @@ var KEYWORD_STOP_WORDS = new Set([
   "beyond",
   "inside",
   "outside",
-  "beneath",
   "within",
-  "without",
   "little",
   "enough",
   "every",
@@ -1892,38 +2158,8 @@ var KEYWORD_STOP_WORDS = new Set([
   "whomever",
   "whose",
   "whom",
-  "who",
-  "which",
-  "that",
-  "these",
-  "those"
+  "who"
 ]);
-function parseSummaryResponse(text) {
-  const lines = text.split(`
-`);
-  let lastTitleIdx = -1;
-  let lastContentIdx = -1;
-  for (let i3 = 0;i3 < lines.length; i3++) {
-    const upperLine = lines[i3].toLocaleUpperCase();
-    if (upperLine.startsWith("TITLE:")) {
-      lastTitleIdx = i3;
-    }
-    if (upperLine.startsWith("CONTENT:")) {
-      lastContentIdx = i3;
-    }
-  }
-  if (lastContentIdx === -1)
-    return null;
-  const titleLine = lastTitleIdx >= 0 ? lines[lastTitleIdx].slice(6).trim() : null;
-  const content = lines.slice(lastContentIdx + 1).join(`
-`).trim();
-  if (!content)
-    return null;
-  return {
-    title: titleLine || "Untitled Entry",
-    content
-  };
-}
 
 // src/presets.ts
 var DEFAULT_PARAMS = {
@@ -2023,172 +2259,67 @@ function importPresets(json) {
 }
 
 // src/components/PromptManager.tsx
-var PROMPT_SELECTED_KEY = "chronicle_selected_prompt_preset";
 var PromptManager = ({
   onActivePromptChange,
   onParamsChange,
   loading = false
 }) => {
-  const [presets, setPresets] = d2([]);
+  const pm = usePresetManager({
+    selectedKey: "chronicle_selected_prompt_preset",
+    loadAll: getAllPresets,
+    save: (name) => savePreset(name, "", params),
+    update: (id, updates) => updatePreset(id, updates),
+    findByName: findPresetByName,
+    deletePreset,
+    exportAll: exportPresets,
+    importAll: importPresets
+  });
   const [params, setParams] = d2({ ...DEFAULT_PARAMS });
-  const restoreSelectedPreset = () => {
-    try {
-      const saved = localStorage.getItem(PROMPT_SELECTED_KEY);
-      if (saved && getAllPresets().some((p3) => p3.id === saved))
-        return saved;
-    } catch {}
-    return "default";
-  };
-  const [selectedPresetId, setSelectedPresetId] = d2(restoreSelectedPreset);
-  const [useCustom, setUseCustom] = d2(false);
-  const [isEditing, setIsEditing] = d2(false);
   const [customPrompt, setCustomPrompt] = d2("");
-  const [showSaveDialog, setShowSaveDialog] = d2(false);
-  const [saveName, setSaveName] = d2("");
-  const [importError, setImportError] = d2(null);
-  const [showDeleteConfirm, setShowDeleteConfirm] = d2(false);
   const [expanded, setExpanded] = d2(false);
-  const fileInputRef = A2(null);
-  const autosaveIntervalRef = A2(null);
-  const AUTOSAVE_NAME = "Autosave";
-  y2(() => {
-    setPresets(getAllPresets());
-  }, []);
-  const refreshPresets = q2(() => {
-    setPresets(getAllPresets());
-  }, []);
   const activePrompt = T2(() => {
-    if (useCustom && customPrompt.trim())
+    if (pm.useCustom && customPrompt.trim())
       return customPrompt.trim();
-    if (!useCustom) {
-      const preset = getPreset(selectedPresetId);
+    if (!pm.useCustom) {
+      const preset = getPreset(pm.selectedPresetId);
       return preset?.systemPrompt;
     }
     return;
-  }, [useCustom, customPrompt, selectedPresetId]);
+  }, [pm.useCustom, customPrompt, pm.selectedPresetId]);
   y2(() => {
     onActivePromptChange?.(activePrompt);
   }, [activePrompt, onActivePromptChange]);
   y2(() => {
-    if (!useCustom && selectedPresetId) {
-      const preset = getPreset(selectedPresetId);
+    if (!pm.useCustom && pm.selectedPresetId) {
+      const preset = getPreset(pm.selectedPresetId);
       if (preset?.params) {
         setParams({ ...preset.params });
       } else {
         setParams({ ...DEFAULT_PARAMS });
       }
     }
-  }, [selectedPresetId, useCustom]);
+  }, [pm.selectedPresetId, pm.useCustom]);
   y2(() => {
     onParamsChange?.(params);
   }, [params, onParamsChange]);
-  const ensureAutosavePreset = q2((promptOverride) => {
-    const currentPreset = presets.find((p3) => p3.id === selectedPresetId);
-    if (currentPreset && !currentPreset.builtIn) {
-      if (!isEditing)
-        setIsEditing(true);
-      return;
-    }
-    if (promptOverride === undefined && !customPrompt.trim() && currentPreset?.systemPrompt) {
-      setCustomPrompt(currentPreset.systemPrompt);
-    }
-    const localAutosave = findPresetByName(AUTOSAVE_NAME);
-    if (localAutosave) {
-      setSelectedPresetId(localAutosave.id);
-      try {
-        localStorage.setItem(PROMPT_SELECTED_KEY, localAutosave.id);
-      } catch {}
-      if (localAutosave.params)
-        setParams({ ...localAutosave.params });
-    } else {
-      const saved = savePreset(AUTOSAVE_NAME, promptOverride ?? (customPrompt || currentPreset?.systemPrompt || ""), params);
-      refreshPresets();
-      setSelectedPresetId(saved.id);
-      try {
-        localStorage.setItem(PROMPT_SELECTED_KEY, saved.id);
-      } catch {}
-    }
-    if (!isEditing)
-      setIsEditing(true);
-  }, [presets, selectedPresetId, customPrompt, params, refreshPresets, isEditing]);
-  const doAutosave = q2(() => {
-    if (!isEditing)
-      return;
-    const currentPreset = presets.find((p3) => p3.id === selectedPresetId);
-    if (currentPreset && !currentPreset.builtIn) {
-      const update = { params };
-      if (customPrompt.trim())
-        update.systemPrompt = customPrompt;
-      updatePreset(selectedPresetId, update);
-      refreshPresets();
-      return;
-    }
-    if (!customPrompt.trim())
-      return;
-    const existing = findPresetByName(AUTOSAVE_NAME);
-    let saved;
-    if (existing) {
-      const updated = updatePreset(existing.id, { systemPrompt: customPrompt, params });
-      if (!updated)
-        return;
-      saved = updated;
-    } else {
-      saved = savePreset(AUTOSAVE_NAME, customPrompt, params);
-    }
-    refreshPresets();
-    setSelectedPresetId(saved.id);
-    setIsEditing(false);
-    try {
-      localStorage.setItem(PROMPT_SELECTED_KEY, saved.id);
-    } catch {}
-  }, [isEditing, customPrompt, params, refreshPresets, presets, selectedPresetId]);
-  const doAutosaveRef = A2(doAutosave);
-  doAutosaveRef.current = doAutosave;
-  const stopAutosaveInterval = q2(() => {
-    if (autosaveIntervalRef.current !== null) {
-      clearInterval(autosaveIntervalRef.current);
-      autosaveIntervalRef.current = null;
-    }
-  }, []);
-  const startAutosaveInterval = q2(() => {
-    stopAutosaveInterval();
-    autosaveIntervalRef.current = setInterval(() => doAutosaveRef.current(), 3000);
-  }, [stopAutosaveInterval]);
-  y2(() => {
-    return () => {
-      doAutosaveRef.current();
-      stopAutosaveInterval();
-    };
-  }, []);
-  y2(() => {
-    if (isEditing && customPrompt.trim()) {
-      doAutosaveRef.current();
-      startAutosaveInterval();
-    } else {
-      stopAutosaveInterval();
-    }
-  }, [isEditing, customPrompt]);
   const handlePresetChange = q2((e3) => {
     const id = e3.target.value;
-    if (id === selectedPresetId && !useCustom)
+    if (id === pm.selectedPresetId && !pm.useCustom)
       return;
     if (id === "__custom__") {
-      if (!useCustom) {
-        const current = getPreset(selectedPresetId);
+      if (!pm.useCustom) {
+        const current = getPreset(pm.selectedPresetId);
         if (current)
           setCustomPrompt(current.systemPrompt || "");
       }
-      setUseCustom(true);
+      pm.setUseCustom(true);
     } else {
-      doAutosaveRef.current();
-      stopAutosaveInterval();
-      setSelectedPresetId(id);
-      setUseCustom(false);
-      setIsEditing(false);
+      pm.doAutosaveRef.current?.();
+      pm.stopAutosaveInterval();
+      pm.setSelectedPresetId(id);
+      pm.setUseCustom(false);
+      pm.setIsEditing(false);
       setCustomPrompt("");
-      try {
-        localStorage.setItem(PROMPT_SELECTED_KEY, id);
-      } catch {}
       const preset = getPreset(id);
       if (preset?.params) {
         setParams({ ...preset.params });
@@ -2196,91 +2327,93 @@ var PromptManager = ({
         setParams({ ...DEFAULT_PARAMS });
       }
     }
-  }, [selectedPresetId, useCustom, stopAutosaveInterval]);
-  const selectedPreset = presets.find((p3) => p3.id === selectedPresetId);
+  }, [pm.selectedPresetId, pm.useCustom, pm.stopAutosaveInterval]);
+  const ensureAutosavePreset = q2((promptOverride) => {
+    const currentPreset = pm.presets.find((p3) => p3.id === pm.selectedPresetId);
+    if (currentPreset && !currentPreset.builtIn) {
+      if (!pm.isEditing)
+        pm.setIsEditing(true);
+      return;
+    }
+    if (promptOverride === undefined && !customPrompt.trim() && currentPreset?.systemPrompt) {
+      setCustomPrompt(currentPreset.systemPrompt);
+    }
+    const localAutosave = findPresetByName("Autosave");
+    if (localAutosave) {
+      pm.setSelectedPresetId(localAutosave.id);
+      if (localAutosave.params)
+        setParams({ ...localAutosave.params });
+    } else {
+      const saved = savePreset("Autosave", promptOverride ?? (customPrompt || currentPreset?.systemPrompt || ""), params);
+      pm.refreshPresets();
+      pm.setSelectedPresetId(saved.id);
+    }
+    if (!pm.isEditing)
+      pm.setIsEditing(true);
+  }, [pm.presets, pm.selectedPresetId, customPrompt, params, pm.refreshPresets, pm.isEditing]);
+  const doAutosave = q2(() => {
+    if (!pm.isEditing)
+      return;
+    const currentPreset = pm.presets.find((p3) => p3.id === pm.selectedPresetId);
+    if (currentPreset && !currentPreset.builtIn) {
+      const update = { params };
+      if (customPrompt.trim())
+        update.systemPrompt = customPrompt;
+      updatePreset(pm.selectedPresetId, update);
+      pm.refreshPresets();
+      return;
+    }
+    if (!customPrompt.trim())
+      return;
+    const existing = findPresetByName("Autosave");
+    let saved;
+    if (existing) {
+      const updated = updatePreset(existing.id, { systemPrompt: customPrompt, params });
+      if (!updated)
+        return;
+      saved = updated;
+    } else {
+      saved = savePreset("Autosave", customPrompt, params);
+    }
+    pm.refreshPresets();
+    pm.setSelectedPresetId(saved.id);
+    pm.setIsEditing(false);
+  }, [pm.isEditing, customPrompt, params, pm.refreshPresets, pm.presets, pm.selectedPresetId]);
+  pm.doAutosaveRef.current = doAutosave;
+  y2(() => {
+    if (pm.isEditing && customPrompt.trim()) {
+      pm.doAutosaveRef.current?.();
+      pm.startAutosaveInterval();
+    } else {
+      pm.stopAutosaveInterval();
+    }
+  }, [pm.isEditing, customPrompt]);
+  const handleConfirmDelete = q2(() => {
+    if (!pm.selectedPreset)
+      return;
+    deletePreset(pm.selectedPreset.id);
+    pm.refreshPresets();
+    if (pm.selectedPresetId === pm.selectedPreset.id) {
+      pm.setSelectedPresetId("default");
+      pm.setIsEditing(false);
+      setCustomPrompt("");
+    }
+    pm.setShowDeleteConfirm(false);
+  }, [pm.selectedPreset, pm.selectedPresetId, pm.refreshPresets]);
   const handleSavePreset = q2(() => {
-    if (!saveName.trim())
+    if (!pm.saveName.trim())
       return;
     if (!activePrompt)
       return;
-    stopAutosaveInterval();
-    setIsEditing(false);
-    const saved = savePreset(saveName.trim(), activePrompt, params);
-    refreshPresets();
-    setSelectedPresetId(saved.id);
-    setUseCustom(false);
-    try {
-      localStorage.setItem(PROMPT_SELECTED_KEY, saved.id);
-    } catch {}
-    setSaveName("");
-    setShowSaveDialog(false);
-  }, [saveName, activePrompt, params, refreshPresets, stopAutosaveInterval]);
-  const handleDeleteClick = q2(() => {
-    setShowDeleteConfirm(true);
-  }, []);
-  const handleConfirmDelete = q2(() => {
-    if (!selectedPreset)
-      return;
-    deletePreset(selectedPreset.id);
-    refreshPresets();
-    if (selectedPresetId === selectedPreset.id) {
-      setSelectedPresetId("default");
-      setIsEditing(false);
-      setCustomPrompt("");
-      try {
-        localStorage.setItem(PROMPT_SELECTED_KEY, "default");
-      } catch {}
-    }
-    setShowDeleteConfirm(false);
-  }, [selectedPreset, selectedPresetId, refreshPresets]);
-  const handleCancelDelete = q2(() => {
-    setShowDeleteConfirm(false);
-  }, []);
-  y2(() => {
-    if (showDeleteConfirm)
-      setShowDeleteConfirm(false);
-  }, [selectedPresetId]);
-  const handleExport = q2(() => {
-    const json = exportPresets();
-    const blob = new Blob([json], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a3 = document.createElement("a");
-    a3.href = url;
-    a3.download = `chronicle-presets-${new Date().toISOString().slice(0, 10)}.json`;
-    a3.click();
-    URL.revokeObjectURL(url);
-  }, []);
-  const handleImportFile = q2((e3) => {
-    const input = e3.target;
-    const file = input.files?.[0];
-    if (!file)
-      return;
-    const reader = new FileReader;
-    reader.onload = () => {
-      const text = reader.result;
-      const result = importPresets(text);
-      if (result.success) {
-        refreshPresets();
-        setImportError(null);
-      } else {
-        setImportError(result.error || "Import failed");
-      }
-    };
-    reader.readAsText(file);
-    input.value = "";
-  }, [refreshPresets]);
-  const handleTriggerImport = q2(() => {
-    fileInputRef.current?.click();
-  }, []);
-  const prevPresetRef = A2(null);
-  y2(() => {
-    const prev = prevPresetRef.current;
-    if (prev !== null && prev !== selectedPresetId) {
-      const p3 = getPreset(selectedPresetId);
-      console.log("[Chronicle-prompts] preset switch:", prev, "→", selectedPresetId, "| params from preset:", p3?.params ? JSON.stringify(p3.params) : "none (will use DEFAULT)", "| current params state:", JSON.stringify(params));
-    }
-    prevPresetRef.current = selectedPresetId;
-  });
+    pm.stopAutosaveInterval();
+    pm.setIsEditing(false);
+    const saved = savePreset(pm.saveName.trim(), activePrompt, params);
+    pm.refreshPresets();
+    pm.setSelectedPresetId(saved.id);
+    pm.setUseCustom(false);
+    pm.setSaveName("");
+    pm.setShowSaveDialog(false);
+  }, [pm.saveName, activePrompt, params, pm.refreshPresets, pm.stopAutosaveInterval]);
   return /* @__PURE__ */ u3("div", {
     "data-chronicle": "prompt-manager",
     children: [
@@ -2297,11 +2430,11 @@ var PromptManager = ({
           }, undefined, false, undefined, this),
           /* @__PURE__ */ u3("select", {
             class: "chronicle-pm-select",
-            value: useCustom ? "__custom__" : selectedPresetId,
+            value: pm.useCustom ? "__custom__" : pm.selectedPresetId,
             onChange: handlePresetChange,
             disabled: loading,
             children: [
-              presets.map((p3) => /* @__PURE__ */ u3("option", {
+              pm.presets.map((p3) => /* @__PURE__ */ u3("option", {
                 value: p3.id,
                 children: [
                   p3.name,
@@ -2316,7 +2449,7 @@ var PromptManager = ({
           }, undefined, true, undefined, this)
         ]
       }, undefined, true, undefined, this),
-      selectedPreset && /* @__PURE__ */ u3("div", {
+      pm.selectedPreset && /* @__PURE__ */ u3("div", {
         class: "chronicle-pm-preview-section",
         children: [
           /* @__PURE__ */ u3("div", {
@@ -2333,40 +2466,40 @@ var PromptManager = ({
               /* @__PURE__ */ u3("div", {
                 class: "chronicle-pm-toolbar",
                 children: [
-                  selectedPreset && !selectedPreset.builtIn && /* @__PURE__ */ u3("button", {
+                  pm.selectedPreset && !pm.selectedPreset.builtIn && /* @__PURE__ */ u3("button", {
                     class: "chronicle-pm-delete-btn",
-                    onClick: handleDeleteClick,
+                    onClick: pm.handleDeleteClick,
                     disabled: loading,
                     title: "Delete this preset",
                     children: "Delete Preset"
                   }, undefined, false, undefined, this),
                   /* @__PURE__ */ u3("button", {
                     class: "chronicle-pm-tool-btn",
-                    onClick: () => setShowSaveDialog(true),
-                    disabled: loading || !useCustom && !selectedPreset,
+                    onClick: () => pm.setShowSaveDialog(true),
+                    disabled: loading || !pm.useCustom && !pm.selectedPreset,
                     title: "Save current custom prompt as a named preset",
                     children: "Save"
                   }, undefined, false, undefined, this),
                   /* @__PURE__ */ u3("button", {
                     class: "chronicle-pm-tool-btn",
-                    onClick: handleExport,
-                    disabled: presets.filter((p3) => !p3.builtIn).length === 0,
+                    onClick: pm.handleExport,
+                    disabled: pm.presets.filter((p3) => !p3.builtIn).length === 0,
                     title: "Export custom presets",
                     children: "Export"
                   }, undefined, false, undefined, this),
                   /* @__PURE__ */ u3("button", {
                     class: "chronicle-pm-tool-btn",
-                    onClick: handleTriggerImport,
+                    onClick: pm.handleTriggerImport,
                     disabled: loading,
                     title: "Import presets from file",
                     children: "Import"
                   }, undefined, false, undefined, this),
                   /* @__PURE__ */ u3("input", {
-                    ref: fileInputRef,
+                    ref: pm.fileInputRef,
                     type: "file",
                     accept: ".json",
                     style: { display: "none" },
-                    onChange: handleImportFile
+                    onChange: pm.handleImportFile
                   }, undefined, false, undefined, this)
                 ]
               }, undefined, true, undefined, this)
@@ -2376,7 +2509,7 @@ var PromptManager = ({
             children: [
               /* @__PURE__ */ u3("textarea", {
                 class: "chronicle-pm-textarea",
-                value: useCustom || isEditing ? customPrompt : selectedPreset?.systemPrompt || "",
+                value: pm.useCustom || pm.isEditing ? customPrompt : pm.selectedPreset?.systemPrompt || "",
                 onInput: (e3) => {
                   const val = e3.target.value;
                   setCustomPrompt(val);
@@ -2497,13 +2630,13 @@ var PromptManager = ({
           }, undefined, true, undefined, this)
         ]
       }, undefined, true, undefined, this),
-      importError && /* @__PURE__ */ u3("div", {
+      pm.importError && /* @__PURE__ */ u3("div", {
         class: "chronicle-pm-error",
-        children: importError
+        children: pm.importError
       }, undefined, false, undefined, this),
-      showSaveDialog && /* @__PURE__ */ u3("div", {
+      pm.showSaveDialog && /* @__PURE__ */ u3("div", {
         class: "chronicle-pm-overlay",
-        onClick: () => setShowSaveDialog(false),
+        onClick: () => pm.setShowSaveDialog(false),
         children: /* @__PURE__ */ u3("div", {
           class: "chronicle-pm-dialog",
           onClick: (e3) => e3.stopPropagation(),
@@ -2513,8 +2646,8 @@ var PromptManager = ({
             }, undefined, false, undefined, this),
             /* @__PURE__ */ u3("input", {
               class: "chronicle-pm-input",
-              value: saveName,
-              onInput: (e3) => setSaveName(e3.target.value),
+              value: pm.saveName,
+              onInput: (e3) => pm.setSaveName(e3.target.value),
               placeholder: "Preset name…",
               onKeyDown: (e3) => e3.key === "Enter" && handleSavePreset(),
               autoFocus: true
@@ -2524,13 +2657,13 @@ var PromptManager = ({
               children: [
                 /* @__PURE__ */ u3("button", {
                   class: "chronicle-pm-dialog-btn",
-                  onClick: () => setShowSaveDialog(false),
+                  onClick: () => pm.setShowSaveDialog(false),
                   children: "Cancel"
                 }, undefined, false, undefined, this),
                 /* @__PURE__ */ u3("button", {
                   class: "chronicle-pm-dialog-btn chronicle-pm-dialog-primary",
                   onClick: handleSavePreset,
-                  disabled: !saveName.trim(),
+                  disabled: !pm.saveName.trim(),
                   children: "Save"
                 }, undefined, false, undefined, this)
               ]
@@ -2538,9 +2671,9 @@ var PromptManager = ({
           ]
         }, undefined, true, undefined, this)
       }, undefined, false, undefined, this),
-      showDeleteConfirm && selectedPreset && /* @__PURE__ */ u3("div", {
+      pm.showDeleteConfirm && pm.selectedPreset && /* @__PURE__ */ u3("div", {
         class: "chronicle-dc-overlay",
-        onClick: handleCancelDelete,
+        onClick: pm.handleCancelDelete,
         children: /* @__PURE__ */ u3("div", {
           class: "chronicle-dc-dialog",
           onClick: (e3) => e3.stopPropagation(),
@@ -2553,7 +2686,7 @@ var PromptManager = ({
               children: [
                 "Are you sure you want to delete ",
                 /* @__PURE__ */ u3("strong", {
-                  children: selectedPreset.name
+                  children: pm.selectedPreset.name
                 }, undefined, false, undefined, this),
                 "? This cannot be undone."
               ]
@@ -2568,7 +2701,7 @@ var PromptManager = ({
                 }, undefined, false, undefined, this),
                 /* @__PURE__ */ u3("button", {
                   class: "chronicle-dc-btn",
-                  onClick: handleCancelDelete,
+                  onClick: pm.handleCancelDelete,
                   children: "Cancel"
                 }, undefined, false, undefined, this)
               ]
@@ -2769,107 +2902,78 @@ function settingsToCreateInput(settings) {
 }
 
 // src/components/SettingsManager.tsx
-var SETTINGS_SELECTED_KEY = "chronicle_selected_settings_preset";
 var SettingsManager = ({
   settings,
   onSettingsChange,
   loading = false
 }) => {
-  const [presets, setPresets] = d2([]);
-  const restoreSelectedPreset = () => {
-    try {
-      const saved = localStorage.getItem(SETTINGS_SELECTED_KEY);
-      if (saved && getAllSettingsPresets().some((p3) => p3.id === saved))
-        return saved;
-    } catch {}
-    return "default";
-  };
-  const [selectedPresetId, setSelectedPresetId] = d2(restoreSelectedPreset);
-  const [useCustom, setUseCustom] = d2(false);
-  const [isEditing, setIsEditing] = d2(false);
+  const pm = usePresetManager({
+    selectedKey: "chronicle_selected_settings_preset",
+    loadAll: getAllSettingsPresets,
+    save: (name) => saveSettingsPreset(name, settings),
+    update: (id, updates) => updateSettingsPreset(id, updates),
+    findByName: findSettingsPresetByName,
+    deletePreset: deleteSettingsPreset,
+    exportAll: exportSettingsPresets,
+    importAll: importSettingsPresets
+  });
   const [expanded, setExpanded] = d2(false);
-  const [showSaveDialog, setShowSaveDialog] = d2(false);
-  const [saveName, setSaveName] = d2("");
-  const [importError, setImportError] = d2(null);
-  const [showDeleteConfirm, setShowDeleteConfirm] = d2(false);
-  const fileInputRef = A2(null);
-  const autosaveIntervalRef = A2(null);
-  const doAutosaveRef = A2(null);
-  const AUTOSAVE_NAME = "Autosave";
   const [timingOpen, setTimingOpen] = d2(false);
   const [recursionOpen, setRecursionOpen] = d2(false);
   const [groupOpen, setGroupOpen] = d2(false);
   const [metadataOpen, setMetadataOpen] = d2(false);
-  y2(() => {
-    setPresets(getAllSettingsPresets());
-  }, []);
-  const refreshPresets = q2(() => {
-    setPresets(getAllSettingsPresets());
-  }, []);
   const applyPreset = q2((id) => {
     if (id === "__custom__") {
-      setUseCustom(true);
+      pm.setUseCustom(true);
       return;
     }
-    if (autosaveIntervalRef.current !== null) {
-      clearInterval(autosaveIntervalRef.current);
-      autosaveIntervalRef.current = null;
-    }
+    pm.stopAutosaveInterval();
     const preset = getSettingsPreset(id);
     if (preset) {
       onSettingsChange({ ...preset.settings });
-      setSelectedPresetId(id);
-      setUseCustom(false);
-      setIsEditing(false);
-      try {
-        localStorage.setItem(SETTINGS_SELECTED_KEY, id);
-      } catch {}
+      pm.setSelectedPresetId(id);
+      pm.setUseCustom(false);
+      pm.setIsEditing(false);
     }
-  }, [onSettingsChange]);
+  }, [onSettingsChange, pm.stopAutosaveInterval]);
   const handlePresetChange = q2((e3) => {
     const id = e3.target.value;
-    if (id === selectedPresetId && !useCustom)
+    if (id === pm.selectedPresetId && !pm.useCustom)
       return;
     if (id === "__custom__") {
-      setUseCustom(true);
+      pm.setUseCustom(true);
     } else {
       applyPreset(id);
     }
-  }, [useCustom, applyPreset]);
+  }, [pm.selectedPresetId, pm.useCustom, applyPreset]);
   const ensureAutosavePreset = q2((overrideSettings) => {
-    const currentPreset = presets.find((p3) => p3.id === selectedPresetId);
+    const currentPreset = pm.presets.find((p3) => p3.id === pm.selectedPresetId);
     if (currentPreset && !currentPreset.builtIn) {
-      if (!isEditing)
-        setIsEditing(true);
+      if (!pm.isEditing)
+        pm.setIsEditing(true);
       return;
     }
-    const autosave = presets.find((p3) => p3.name === AUTOSAVE_NAME && !p3.builtIn);
+    const autosave = pm.presets.find((p3) => p3.name === "Autosave" && !p3.builtIn);
     if (autosave) {
-      setSelectedPresetId(autosave.id);
-      try {
-        localStorage.setItem(SETTINGS_SELECTED_KEY, autosave.id);
-      } catch {}
+      pm.setSelectedPresetId(autosave.id);
     } else {
-      const saved = saveSettingsPreset(AUTOSAVE_NAME, overrideSettings ?? settings);
-      refreshPresets();
-      setSelectedPresetId(saved.id);
-      try {
-        localStorage.setItem(SETTINGS_SELECTED_KEY, saved.id);
-      } catch {}
+      const saved = saveSettingsPreset("Autosave", overrideSettings ?? settings);
+      pm.refreshPresets();
+      pm.setSelectedPresetId(saved.id);
     }
-    if (!isEditing)
-      setIsEditing(true);
-  }, [presets, selectedPresetId, settings, refreshPresets, isEditing]);
+    if (!pm.isEditing)
+      pm.setIsEditing(true);
+  }, [pm.presets, pm.selectedPresetId, settings, pm.refreshPresets, pm.isEditing]);
   const doAutosave = q2(() => {
-    if (!isEditing)
+    if (!pm.isEditing)
       return;
-    const currentPreset = presets.find((p3) => p3.id === selectedPresetId);
+    const currentPreset = pm.presets.find((p3) => p3.id === pm.selectedPresetId);
     if (currentPreset && !currentPreset.builtIn) {
-      updateSettingsPreset(selectedPresetId, { settings });
-      refreshPresets();
+      updateSettingsPreset(pm.selectedPresetId, { settings });
+      pm.refreshPresets();
       return;
     }
-    const existing = findSettingsPresetByName(AUTOSAVE_NAME);
+    const existing = findSettingsPresetByName("Autosave");
     let saved;
     if (existing) {
       const updated = updateSettingsPreset(existing.id, { settings });
@@ -2877,122 +2981,46 @@ var SettingsManager = ({
         return;
       saved = updated;
     } else {
-      saved = saveSettingsPreset(AUTOSAVE_NAME, settings);
+      saved = saveSettingsPreset("Autosave", settings);
     }
-    refreshPresets();
-    setSelectedPresetId(saved.id);
-    setIsEditing(false);
-    try {
-      localStorage.setItem(SETTINGS_SELECTED_KEY, saved.id);
-    } catch {}
-  }, [isEditing, settings, refreshPresets, presets, selectedPresetId]);
-  doAutosaveRef.current = doAutosave;
-  const stopAutosaveInterval = q2(() => {
-    if (autosaveIntervalRef.current !== null) {
-      clearInterval(autosaveIntervalRef.current);
-      autosaveIntervalRef.current = null;
-    }
-  }, []);
-  const startAutosaveInterval = q2(() => {
-    stopAutosaveInterval();
-    autosaveIntervalRef.current = setInterval(() => doAutosaveRef.current?.(), 3000);
-  }, [stopAutosaveInterval]);
-  y2(() => {
-    return () => {
-      doAutosaveRef.current?.();
-      stopAutosaveInterval();
-    };
-  }, []);
-  y2(() => {
-    if (isEditing) {
-      doAutosaveRef.current?.();
-      startAutosaveInterval();
-    } else {
-      stopAutosaveInterval();
-    }
-  }, [isEditing]);
-  const handleSavePreset = q2(() => {
-    if (!saveName.trim())
-      return;
-    stopAutosaveInterval();
-    setIsEditing(false);
-    const saved = saveSettingsPreset(saveName.trim(), settings);
-    refreshPresets();
-    setSelectedPresetId(saved.id);
-    setUseCustom(false);
-    try {
-      localStorage.setItem(SETTINGS_SELECTED_KEY, saved.id);
-    } catch {}
-    setSaveName("");
-    setShowSaveDialog(false);
-  }, [saveName, settings, refreshPresets, stopAutosaveInterval]);
-  const selectedPreset = presets.find((p3) => p3.id === selectedPresetId);
-  const handleDeleteClick = q2(() => {
-    setShowDeleteConfirm(true);
-  }, []);
+    pm.refreshPresets();
+    pm.setSelectedPresetId(saved.id);
+    pm.setIsEditing(false);
+  }, [pm.isEditing, settings, pm.refreshPresets, pm.presets, pm.selectedPresetId]);
+  pm.doAutosaveRef.current = doAutosave;
   const handleConfirmDelete = q2(() => {
-    if (!selectedPreset)
+    if (!pm.selectedPreset)
       return;
-    deleteSettingsPreset(selectedPreset.id);
-    refreshPresets();
-    if (selectedPresetId === selectedPreset.id) {
-      setSelectedPresetId("default");
-      setIsEditing(false);
-      try {
-        localStorage.setItem(SETTINGS_SELECTED_KEY, "default");
-      } catch {}
+    deleteSettingsPreset(pm.selectedPreset.id);
+    pm.refreshPresets();
+    if (pm.selectedPresetId === pm.selectedPreset.id) {
+      pm.setSelectedPresetId("default");
+      pm.setIsEditing(false);
       const defaultPreset = getSettingsPreset("default");
       if (defaultPreset)
         onSettingsChange({ ...defaultPreset.settings });
     }
-    setShowDeleteConfirm(false);
-  }, [selectedPreset, selectedPresetId, refreshPresets, onSettingsChange]);
-  const handleCancelDelete = q2(() => {
-    setShowDeleteConfirm(false);
-  }, []);
-  y2(() => {
-    if (showDeleteConfirm)
-      setShowDeleteConfirm(false);
-  }, [selectedPresetId]);
-  const handleExport = q2(() => {
-    const json = exportSettingsPresets();
-    const blob = new Blob([json], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a3 = document.createElement("a");
-    a3.href = url;
-    a3.download = `chronicle-settings-${new Date().toISOString().slice(0, 10)}.json`;
-    a3.click();
-    URL.revokeObjectURL(url);
-  }, []);
-  const handleImportFile = q2((e3) => {
-    const input = e3.target;
-    const file = input.files?.[0];
-    if (!file)
+    pm.setShowDeleteConfirm(false);
+  }, [pm.selectedPreset, pm.selectedPresetId, pm.refreshPresets, onSettingsChange]);
+  const handleSavePreset = q2(() => {
+    if (!pm.saveName.trim())
       return;
-    const reader = new FileReader;
-    reader.onload = () => {
-      const text = reader.result;
-      const result = importSettingsPresets(text);
-      if (result.success) {
-        refreshPresets();
-        setImportError(null);
-      } else {
-        setImportError(result.error || "Import failed");
-      }
-    };
-    reader.readAsText(file);
-    input.value = "";
-  }, [refreshPresets]);
-  const handleTriggerImport = q2(() => {
-    fileInputRef.current?.click();
-  }, []);
+    pm.stopAutosaveInterval();
+    pm.setIsEditing(false);
+    const saved = saveSettingsPreset(pm.saveName.trim(), settings);
+    pm.refreshPresets();
+    pm.setSelectedPresetId(saved.id);
+    pm.setUseCustom(false);
+    pm.setSaveName("");
+    pm.setShowSaveDialog(false);
+  }, [pm.saveName, settings, pm.refreshPresets, pm.stopAutosaveInterval]);
   const update = q2((key, value) => {
     const newSettings = { ...settings, [key]: value };
     onSettingsChange(newSettings);
-    if (useCustom || selectedPreset && !selectedPreset.builtIn) {
+    if (pm.useCustom || pm.selectedPreset && !pm.selectedPreset.builtIn) {
       ensureAutosavePreset(newSettings);
     }
-  }, [settings, onSettingsChange, ensureAutosavePreset, useCustom, selectedPreset]);
+  }, [settings, onSettingsChange, ensureAutosavePreset, pm.useCustom, pm.selectedPreset]);
   const toggle = q2((key) => {
     update(key, !settings[key]);
   }, [update, settings]);
@@ -3008,11 +3036,11 @@ var SettingsManager = ({
           }, undefined, false, undefined, this),
           /* @__PURE__ */ u3("select", {
             class: "chronicle-sm-select",
-            value: useCustom ? "__custom__" : selectedPresetId,
+            value: pm.useCustom ? "__custom__" : pm.selectedPresetId,
             onChange: handlePresetChange,
             disabled: loading,
             children: [
-              presets.map((p3) => /* @__PURE__ */ u3("option", {
+              pm.presets.map((p3) => /* @__PURE__ */ u3("option", {
                 value: p3.id,
                 children: [
                   p3.name,
@@ -3041,40 +3069,40 @@ var SettingsManager = ({
           /* @__PURE__ */ u3("div", {
             class: "chronicle-sm-toolbar",
             children: [
-              selectedPreset && !selectedPreset.builtIn && /* @__PURE__ */ u3("button", {
+              pm.selectedPreset && !pm.selectedPreset.builtIn && /* @__PURE__ */ u3("button", {
                 class: "chronicle-sm-delete-btn",
-                onClick: handleDeleteClick,
+                onClick: pm.handleDeleteClick,
                 disabled: loading,
                 title: "Delete this preset",
                 children: "Delete Preset"
               }, undefined, false, undefined, this),
               /* @__PURE__ */ u3("button", {
                 class: "chronicle-sm-tool-btn",
-                onClick: () => setShowSaveDialog(true),
-                disabled: loading || !useCustom,
+                onClick: () => pm.setShowSaveDialog(true),
+                disabled: loading || !pm.useCustom,
                 title: "Save as preset",
                 children: "Save"
               }, undefined, false, undefined, this),
               /* @__PURE__ */ u3("button", {
                 class: "chronicle-sm-tool-btn",
-                onClick: handleExport,
-                disabled: presets.filter((p3) => !p3.builtIn).length === 0,
+                onClick: pm.handleExport,
+                disabled: pm.presets.filter((p3) => !p3.builtIn).length === 0,
                 title: "Export custom presets",
                 children: "Export"
               }, undefined, false, undefined, this),
               /* @__PURE__ */ u3("button", {
                 class: "chronicle-sm-tool-btn",
-                onClick: handleTriggerImport,
+                onClick: pm.handleTriggerImport,
                 disabled: loading,
                 title: "Import presets from file",
                 children: "Import"
               }, undefined, false, undefined, this),
               /* @__PURE__ */ u3("input", {
-                ref: fileInputRef,
+                ref: pm.fileInputRef,
                 type: "file",
                 accept: ".json",
                 style: { display: "none" },
-                onChange: handleImportFile
+                onChange: pm.handleImportFile
               }, undefined, false, undefined, this)
             ]
           }, undefined, true, undefined, this)
@@ -3598,13 +3626,13 @@ var SettingsManager = ({
           }, undefined, false, undefined, this)
         ]
       }, undefined, true, undefined, this),
-      importError && /* @__PURE__ */ u3("div", {
+      pm.importError && /* @__PURE__ */ u3("div", {
         class: "chronicle-sm-error",
-        children: importError
+        children: pm.importError
       }, undefined, false, undefined, this),
-      showSaveDialog && /* @__PURE__ */ u3("div", {
+      pm.showSaveDialog && /* @__PURE__ */ u3("div", {
         class: "chronicle-sm-overlay",
-        onClick: () => setShowSaveDialog(false),
+        onClick: () => pm.setShowSaveDialog(false),
         children: /* @__PURE__ */ u3("div", {
           class: "chronicle-sm-dialog",
           onClick: (e3) => e3.stopPropagation(),
@@ -3614,8 +3642,8 @@ var SettingsManager = ({
             }, undefined, false, undefined, this),
             /* @__PURE__ */ u3("input", {
               class: "chronicle-sm-input",
-              value: saveName,
-              onInput: (e3) => setSaveName(e3.target.value),
+              value: pm.saveName,
+              onInput: (e3) => pm.setSaveName(e3.target.value),
               placeholder: "Preset name…",
               onKeyDown: (e3) => e3.key === "Enter" && handleSavePreset(),
               autoFocus: true
@@ -3625,13 +3653,13 @@ var SettingsManager = ({
               children: [
                 /* @__PURE__ */ u3("button", {
                   class: "chronicle-sm-dialog-btn",
-                  onClick: () => setShowSaveDialog(false),
+                  onClick: () => pm.setShowSaveDialog(false),
                   children: "Cancel"
                 }, undefined, false, undefined, this),
                 /* @__PURE__ */ u3("button", {
                   class: "chronicle-sm-dialog-btn chronicle-sm-dialog-primary",
                   onClick: handleSavePreset,
-                  disabled: !saveName.trim(),
+                  disabled: !pm.saveName.trim(),
                   children: "Save"
                 }, undefined, false, undefined, this)
               ]
@@ -3639,9 +3667,9 @@ var SettingsManager = ({
           ]
         }, undefined, true, undefined, this)
       }, undefined, false, undefined, this),
-      showDeleteConfirm && selectedPreset && /* @__PURE__ */ u3("div", {
+      pm.showDeleteConfirm && pm.selectedPreset && /* @__PURE__ */ u3("div", {
         class: "chronicle-dc-overlay",
-        onClick: handleCancelDelete,
+        onClick: pm.handleCancelDelete,
         children: /* @__PURE__ */ u3("div", {
           class: "chronicle-dc-dialog",
           onClick: (e3) => e3.stopPropagation(),
@@ -3654,7 +3682,7 @@ var SettingsManager = ({
               children: [
                 "Are you sure you want to delete ",
                 /* @__PURE__ */ u3("strong", {
-                  children: selectedPreset.name
+                  children: pm.selectedPreset.name
                 }, undefined, false, undefined, this),
                 "? This cannot be undone."
               ]
@@ -3669,7 +3697,7 @@ var SettingsManager = ({
                 }, undefined, false, undefined, this),
                 /* @__PURE__ */ u3("button", {
                   class: "chronicle-dc-btn",
-                  onClick: handleCancelDelete,
+                  onClick: pm.handleCancelDelete,
                   children: "Cancel"
                 }, undefined, false, undefined, this)
               ]
@@ -3714,7 +3742,7 @@ var ConnectionManager = ({
   const [fetching, setFetching] = d2(true);
   const [hintDismissed, setHintDismissed] = d2(() => {
     try {
-      return localStorage.getItem("chronicle:connHintDismissed") === "true";
+      return localStorage.getItem("chronicle_connHintDismissed") === "true";
     } catch {
       return false;
     }
@@ -3770,7 +3798,7 @@ var ConnectionManager = ({
   const dismissHint = () => {
     setHintDismissed(true);
     try {
-      localStorage.setItem("chronicle:connHintDismissed", "true");
+      localStorage.setItem("chronicle_connHintDismissed", "true");
     } catch {}
   };
   const isDisabled = loading || fetching;
@@ -3995,6 +4023,28 @@ var LorebookManager = ({
   }, undefined, false, undefined, this);
 };
 
+// src/hooks.ts
+function usePersistedState(key, defaultValue, serialize = String, deserialize = (s3) => s3) {
+  const [state, setState] = d2(() => {
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw !== null)
+        return deserialize(raw);
+    } catch {}
+    return defaultValue;
+  });
+  const setPersisted = q2((v3) => {
+    setState((prev) => {
+      const next = typeof v3 === "function" ? v3(prev) : v3;
+      try {
+        localStorage.setItem(key, serialize(next));
+      } catch {}
+      return next;
+    });
+  }, [key, serialize]);
+  return [state, setPersisted];
+}
+
 // src/types.ts
 var PROTOCOL_VERSION = 2;
 function isValidSummarizeRequestV2(payload) {
@@ -4024,6 +4074,58 @@ function isValidListLorebooksRequest(payload) {
   if (!payload || typeof payload !== "object")
     return false;
   return payload.type === "list_lorebooks";
+}
+
+// src/connections-nav.ts
+function blinkButton(btn) {
+  btn.classList.remove("chronicle-conn-highlight");
+  btn.offsetWidth;
+  btn.classList.add("chronicle-conn-highlight");
+}
+function watchForDuplicateMenuItem(startTime) {
+  const observer = new MutationObserver((mutations) => {
+    const hasAddedNodes = mutations.some((m3) => m3.addedNodes.length > 0);
+    if (!hasAddedNodes && Date.now() - startTime < 30000)
+      return;
+    if (Date.now() - startTime > 30000) {
+      observer.disconnect();
+      return;
+    }
+    const items = document.querySelectorAll('[class*="contextMenu"] button, [class*="ContextMenu"] button');
+    for (const btn of items) {
+      if (btn.textContent?.includes("Duplicate")) {
+        blinkButton(btn);
+        observer.disconnect();
+        break;
+      }
+    }
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+  setTimeout(() => observer.disconnect(), 35000);
+}
+function openConnectionsDrawer(onModalClose) {
+  onModalClose?.();
+  requestAnimationFrame(() => {
+    const connectBtn = document.querySelector('button[title="Connections"]');
+    if (connectBtn)
+      connectBtn.click();
+    setTimeout(() => {
+      const allButtons = document.querySelectorAll("button");
+      for (const btn of allButtons) {
+        if (btn.textContent?.includes("New Connection")) {
+          blinkButton(btn);
+          break;
+        }
+      }
+    }, 300);
+    setTimeout(() => {
+      const moreBtns = document.querySelectorAll('button[title="More actions"]');
+      if (moreBtns.length > 0) {
+        blinkButton(moreBtns[0]);
+        watchForDuplicateMenuItem(Date.now());
+      }
+    }, 800);
+  });
 }
 
 // src/components/SummarizeFlow.tsx
@@ -4060,52 +4162,14 @@ var SummarizeFlow = (props) => {
   const [entrySettings, setEntrySettings] = d2(entrySettingsProp ?? { ...DEFAULT_SETTINGS });
   const [connectionId, setConnectionId] = d2(initialConnectionId ?? undefined);
   const [lorebookId, setLorebookId] = d2(lorebookIdProp ?? undefined);
-  const [autoHidePrior, setAutoHidePrior] = d2(() => {
-    try {
-      return localStorage.getItem("chronicle:autoHidePrior") === "true";
-    } catch {
-      return true;
-    }
-  });
-  const [keepVisibleCount, setKeepVisibleCount] = d2(() => {
-    try {
-      const v3 = localStorage.getItem("chronicle:keepVisibleCount");
-      return v3 ? Math.max(0, parseInt(v3, 10) || 0) : 10;
-    } catch {
-      return 10;
-    }
-  });
-  const [includeRecentContext, setIncludeRecentContext] = d2(() => {
-    try {
-      return localStorage.getItem("chronicle:includeRecentContext") === "true";
-    } catch {
-      return false;
-    }
-  });
-  const [recentContextCount, setRecentContextCount] = d2(() => {
-    try {
-      const v3 = localStorage.getItem("chronicle:recentContextCount");
-      return v3 ? Math.max(1, Math.min(10, parseInt(v3, 10) || 3)) : 3;
-    } catch {
-      return 3;
-    }
-  });
+  const [autoHidePrior, setAutoHidePrior] = usePersistedState("chronicle_autoHidePrior", true, String, (v3) => v3 === "true");
+  const [keepVisibleCount, setKeepVisibleCount] = usePersistedState("chronicle_keepVisibleCount", 10, String, (v3) => Math.max(0, parseInt(v3, 10) || 0));
+  const [includeRecentContext, setIncludeRecentContext] = usePersistedState("chronicle_includeRecentContext", false, String, (v3) => v3 === "true");
+  const [recentContextCount, setRecentContextCount] = usePersistedState("chronicle_recentContextCount", 3, String, (v3) => Math.max(1, Math.min(10, parseInt(v3, 10) || 3)));
   const [generationParams, setGenerationParams] = d2(initialGenerationParams ? { ...initialGenerationParams } : { ...DEFAULT_PARAMS });
   const DEFAULT_TITLE_FORMAT = "{number} - {title}";
-  const [titleFormat, setTitleFormat] = d2(() => {
-    try {
-      return localStorage.getItem("chronicle:titleFormat") || DEFAULT_TITLE_FORMAT;
-    } catch {
-      return DEFAULT_TITLE_FORMAT;
-    }
-  });
-  const [useCustomFormat, setUseCustomFormat] = d2(() => {
-    try {
-      return localStorage.getItem("chronicle:useCustomTitleFormat") === "true";
-    } catch {
-      return false;
-    }
-  });
+  const [titleFormat, setTitleFormat] = usePersistedState("chronicle_titleFormat", DEFAULT_TITLE_FORMAT);
+  const [useCustomFormat, setUseCustomFormat] = usePersistedState("chronicle_useCustomTitleFormat", false, String, (v3) => v3 === "true");
   const selectedFormatValue = useCustomFormat ? "__custom__" : titleFormat;
   const previewDataRef = A2(previewProp ?? null);
   const flowStateRef = A2(previewProp ? "preview" : "idle");
@@ -4125,21 +4189,6 @@ var SummarizeFlow = (props) => {
       setSummaryKeys(previewProp.keys ?? []);
     }
   }, [previewProp]);
-  y2(() => {
-    try {
-      localStorage.setItem("chronicle:autoHidePrior", String(autoHidePrior));
-    } catch {}
-  }, [autoHidePrior]);
-  y2(() => {
-    try {
-      localStorage.setItem("chronicle:keepVisibleCount", String(keepVisibleCount));
-    } catch {}
-  }, [keepVisibleCount]);
-  y2(() => {
-    try {
-      localStorage.setItem("chronicle:useCustomTitleFormat", String(useCustomFormat));
-    } catch {}
-  }, [useCustomFormat]);
   y2(() => {
     return () => {
       if (flowStateRef.current === "saving")
@@ -4293,76 +4342,9 @@ var SummarizeFlow = (props) => {
       handleCreateSummary(activePrompt);
     }
   }, [errorStage, previewData, errorRetryable, handleSave, handleCreateSummary, activePrompt]);
-  const activeObserversRef = A2(new Set);
-  const moreActionsBlinkedRef = A2(0);
-  const watchForDuplicate = q2(() => {
-    const observer = new MutationObserver((mutations) => {
-      const hasAddedNodes = mutations.some((m3) => m3.addedNodes.length > 0);
-      if (!hasAddedNodes && Date.now() - moreActionsBlinkedRef.current < 30000)
-        return;
-      if (Date.now() - moreActionsBlinkedRef.current > 30000) {
-        observer.disconnect();
-        activeObserversRef.current.delete(observer);
-        return;
-      }
-      const items = document.querySelectorAll('[class*="contextMenu"] button, [class*="ContextMenu"] button');
-      for (const btn of items) {
-        if (btn.textContent?.includes("Duplicate")) {
-          btn.classList.remove("chronicle-conn-highlight");
-          btn.offsetWidth;
-          btn.classList.add("chronicle-conn-highlight");
-          observer.disconnect();
-          activeObserversRef.current.delete(observer);
-          break;
-        }
-      }
-    });
-    activeObserversRef.current.add(observer);
-    observer.observe(document.body, { childList: true, subtree: true });
-    setTimeout(() => {
-      observer.disconnect();
-      activeObserversRef.current.delete(observer);
-    }, 35000);
-  }, []);
-  y2(() => {
-    return () => {
-      for (const obs of activeObserversRef.current) {
-        obs.disconnect();
-      }
-      activeObserversRef.current.clear();
-    };
-  }, []);
   const handleOpenConnectionsDrawer = q2(() => {
-    onRequestClose?.();
-    requestAnimationFrame(() => {
-      const connectBtn = document.querySelector('button[title="Connections"]');
-      if (connectBtn) {
-        connectBtn.click();
-      }
-      setTimeout(() => {
-        const allButtons = document.querySelectorAll("button");
-        for (const btn of allButtons) {
-          if (btn.textContent?.includes("New Connection")) {
-            btn.classList.remove("chronicle-conn-highlight");
-            btn.offsetWidth;
-            btn.classList.add("chronicle-conn-highlight");
-            break;
-          }
-        }
-      }, 300);
-      setTimeout(() => {
-        const moreBtns = document.querySelectorAll('button[title="More actions"]');
-        if (moreBtns.length > 0) {
-          const moreBtn = moreBtns[0];
-          moreBtn.classList.remove("chronicle-conn-highlight");
-          moreBtn.offsetWidth;
-          moreBtn.classList.add("chronicle-conn-highlight");
-          moreActionsBlinkedRef.current = Date.now();
-          watchForDuplicate();
-        }
-      }, 800);
-    });
-  }, [onRequestClose, watchForDuplicate]);
+    openConnectionsDrawer(onRequestClose);
+  }, [onRequestClose]);
   if (selectedCount === 0 && flowState === "idle") {
     return /* @__PURE__ */ u3("div", {
       class: "chronicle-sf-hint",
@@ -4469,9 +4451,6 @@ var SummarizeFlow = (props) => {
                         onChange: (e3) => {
                           const checked = e3.target.checked;
                           setIncludeRecentContext(checked);
-                          try {
-                            localStorage.setItem("chronicle:includeRecentContext", String(checked));
-                          } catch {}
                         }
                       }, undefined, false, undefined, this),
                       /* @__PURE__ */ u3("span", {
@@ -4507,9 +4486,6 @@ var SummarizeFlow = (props) => {
                         if (!isNaN(v3) && v3 >= 1) {
                           const clamped = Math.max(1, Math.min(10, v3));
                           setRecentContextCount(clamped);
-                          try {
-                            localStorage.setItem("chronicle:recentContextCount", String(clamped));
-                          } catch {}
                         }
                       }
                     }
@@ -4583,9 +4559,6 @@ var SummarizeFlow = (props) => {
                       } else {
                         setUseCustomFormat(false);
                         setTitleFormat(val);
-                        try {
-                          localStorage.setItem("chronicle:titleFormat", val);
-                        } catch {}
                       }
                     },
                     children: TITLE_FORMAT_PRESETS.map((p3) => /* @__PURE__ */ u3("option", {
@@ -4599,9 +4572,6 @@ var SummarizeFlow = (props) => {
                     onInput: (e3) => {
                       const val = e3.target.value;
                       setTitleFormat(val);
-                      try {
-                        localStorage.setItem("chronicle:titleFormat", val);
-                      } catch {}
                     },
                     placeholder: DEFAULT_TITLE_FORMAT
                   }, undefined, false, undefined, this),
@@ -4763,7 +4733,6 @@ var _activeTeardown = null;
 var _modalOpen = false;
 var _modalSafetyTimer = null;
 function setup(spindleCtx) {
-  console.log("[Chronicle] Setup starting...");
   let _removeObserver = null;
   let _removeStyles = null;
   let _backendUnsub = null;
@@ -4818,87 +4787,13 @@ function setup(spindleCtx) {
     _toastCleanup?.();
     _toastCleanup = null;
   }
-  function ChronicleModalShell({ count, onClose, onGenerateStart }) {
-    y2(() => {
-      const handler = (e3) => {
-        if (e3.key === "Escape")
-          onClose();
-      };
-      window.addEventListener("keydown", handler);
-      return () => window.removeEventListener("keydown", handler);
-    }, [onClose]);
-    return /* @__PURE__ */ u3(SummarizeFlow, {
-      selectedCount: count,
-      onRequestClose: onClose,
-      onGenerateStart
-    }, undefined, false, undefined, this);
-  }
-  function openChronicleModal(count) {
-    if (count === 0)
-      return;
-    if (!spindleCtx)
-      return;
-    if (_modalOpen || _generating)
-      return;
-    const maxH = Math.min(720, window.innerHeight - 200);
-    const modal = spindleCtx.ui.showModal({
-      title: "Create Summary / Memory",
-      width: 600,
-      maxHeight: maxH
-    });
-    const handleGenerateStart = (params) => {
-      startGenerating();
-      _generationSelectedCount = count;
-      _generationEntrySettings = params.entrySettings;
-      _generationLorebookId = params.lorebookId;
-      _generationActivePrompt = params.activePrompt;
-      _generationConnectionId = params.connectionId;
-      _generationParams = params.generationParams;
-      showSummaryToast("generating", "Generating summary…");
-      modal.dismiss();
-    };
-    _modalOpen = true;
-    R(/* @__PURE__ */ u3(ChronicleContext.Provider, {
-      value: spindleCtx,
-      children: /* @__PURE__ */ u3(ErrorBoundary, {
-        name: "modal",
-        children: /* @__PURE__ */ u3(ChronicleModalShell, {
-          count,
-          onClose: () => modal.dismiss(),
-          onGenerateStart: handleGenerateStart
-        }, undefined, false, undefined, this)
-      }, undefined, false, undefined, this)
-    }, undefined, false, undefined, this), modal.root);
-    const dismissAndRelease = () => {
-      R(null, modal.root);
-      _modalOpen = false;
-      if (_modalSafetyTimer) {
-        clearTimeout(_modalSafetyTimer);
-        _modalSafetyTimer = null;
-      }
-    };
-    modal.onDismiss(dismissAndRelease);
-    if (_modalSafetyTimer) {
-      clearTimeout(_modalSafetyTimer);
-      _modalSafetyTimer = null;
-    }
-    _modalSafetyTimer = setTimeout(() => {
-      _modalOpen = false;
-      _modalSafetyTimer = null;
-    }, 60000);
-  }
-  _openModal = openChronicleModal;
-  function openPreviewModal(previewData, count) {
+  function openModal({ title, count, preview, boundaryName }) {
     if (!spindleCtx)
       return;
     if (_modalOpen)
       return;
     const maxH = Math.min(720, window.innerHeight - 200);
-    const modal = spindleCtx.ui.showModal({
-      title: `Lorebook Entry Preview (${count} ${count === 1 ? "message" : "messages"})`,
-      width: 600,
-      maxHeight: maxH
-    });
+    const modal = spindleCtx.ui.showModal({ title, width: 600, maxHeight: maxH });
     const handleGenerateStart = (params) => {
       startGenerating();
       _generationSelectedCount = count;
@@ -4918,17 +4813,19 @@ function setup(spindleCtx) {
     R(/* @__PURE__ */ u3(ChronicleContext.Provider, {
       value: spindleCtx,
       children: /* @__PURE__ */ u3(ErrorBoundary, {
-        name: "preview-modal",
+        name: boundaryName,
         children: /* @__PURE__ */ u3(SummarizeFlow, {
           selectedCount: count,
-          preview: previewData,
-          entrySettings: _generationEntrySettings,
-          lorebookId: _generationLorebookId,
-          initialActivePrompt: _generationActivePrompt,
-          initialConnectionId: _generationConnectionId,
-          initialGenerationParams: _generationParams,
           onRequestClose: () => modal.dismiss(),
-          onGenerateStart: handleGenerateStart
+          onGenerateStart: handleGenerateStart,
+          ...preview ? {
+            preview,
+            entrySettings: _generationEntrySettings,
+            lorebookId: _generationLorebookId,
+            initialActivePrompt: _generationActivePrompt,
+            initialConnectionId: _generationConnectionId,
+            initialGenerationParams: _generationParams
+          } : {}
         }, undefined, false, undefined, this)
       }, undefined, false, undefined, this)
     }, undefined, false, undefined, this), modal.root);
@@ -4946,8 +4843,25 @@ function setup(spindleCtx) {
       _modalSafetyTimer = null;
     }, 60000);
   }
+  function openChronicleModal(count) {
+    if (count === 0 || _generating)
+      return;
+    openModal({
+      title: "Create Summary / Memory",
+      count,
+      boundaryName: "modal"
+    });
+  }
+  _openModal = openChronicleModal;
+  function openPreviewModal(previewData, count) {
+    openModal({
+      title: `Lorebook Entry Preview (${count} ${count === 1 ? "message" : "messages"})`,
+      count,
+      preview: previewData,
+      boundaryName: "preview-modal"
+    });
+  }
   function onSelectModeActivate() {
-    console.log("[Chronicle] Select mode activated");
     const existingSummary = document.querySelector('[data-chronicle="summarize-btn"]');
     if (existingSummary) {
       return;
@@ -4956,7 +4870,6 @@ function setup(spindleCtx) {
     _selectBarCleanup = injectIntoSelectBar();
   }
   function onSelectModeDeactivate() {
-    console.log("[Chronicle] Select mode deactivated");
     _selectBarCleanup?.cleanup();
     _selectBarCleanup = null;
   }
@@ -4998,10 +4911,8 @@ function setup(spindleCtx) {
   const fullTeardown = createFullTeardown(teardownState);
   teardownState._teardownRef.current = fullTeardown;
   _activeTeardown = fullTeardown;
-  console.log("[Chronicle] Setup complete");
 }
 function teardown() {
-  console.log("[Chronicle] Teardown requested");
   if (_activeTeardown) {
     _activeTeardown();
     _activeTeardown = null;
@@ -5012,7 +4923,6 @@ function teardown() {
 export {
   teardown,
   setup,
-  parseSummaryResponse,
   isValidSummarizeRequestV2,
   isValidSaveSummaryRequest,
   isValidListLorebooksRequest,
