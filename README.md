@@ -6,11 +6,11 @@ Since you can use lorebooks lots of different ways, Chronicle is useful for all 
 
 ## What sets it apart
 
-> ⚙️ It's lightweight. It doesn't try to be an all-in-one suite or automate a bunch of stuff for you. It's just one small handy tool to pick up and use when you see fit.
+> ⚙️ It's simple and lightweight. It's not an all-in-one suite and it doesn't automate a lot of stuff across different systems. It's just one small handy tool you can fit into your own workflow.
 
-> 📕 Lumiverse's prompt preset and lorebook systems already give you all the UI and tools you need to choose *when*, *where*, and *how* your summaries/memories are shown to the LLM. Chronicle just helps you generate them from chat data and structure them the way you like.
+> 📕 Lumiverse's prompt presets and lorebook system give you all the UI and tools you need to choose *when*, *where*, and *how* your summaries/memories are shown to the LLM. Chronicle's just concerned with helping you generate them from chat data and structure them the way you like.
 
-> 🧠 It can be used standalone or alongside the default Lumiverse Summarize, Memory Cortex, and extensions like Lore Recall. They all do different things, and can harmonize pretty well with the right setup.
+> 🧠 You can use Chronicle standalone or alongside the default Lumiverse Summarize, Memory Cortex, and extensions like Lore Recall. They all do different things, and can harmonize pretty well with the right setup.
 
 ## How to use
 
