@@ -207,11 +207,11 @@ async function generateSummary(
       throw new Error('LLM returned empty response')
     }
 
-    // Parse the JSON response
+    // parseSummaryJson now handles 5 fallback strategies internally.
+    // If it returns null, all parsing failed — use raw text as content.
     const parsed = parseSummaryJson(text.trim())
 
     if (parsed) {
-      // If LLM returned empty keys, generate fallback from content
       const keys = (parsed.keys.length > 0)
         ? parsed.keys
         : extractContentKeywords(parsed.content, parsed.title)
@@ -222,97 +222,11 @@ async function generateSummary(
       }
     }
 
-    // Fallback: JSON parsing failed — try to extract just the "content" field
-    // from any JSON-like object in the raw text.
-    // First find "content": to locate the field, then scan forwards from the
-    // start to find the nearest { before it (tracking string state to avoid
-    // false matches on braces inside string values like {"title": "The {Vault}"}).
-    const rawText = text.trim()
-    const contentKeyMatch = rawText.match(/"content"\s*:\s*"/)
-    if (contentKeyMatch && contentKeyMatch.index !== undefined) {
-      // Forward scan with string-state tracking to find the JSON object's {
-      let braceStart = -1
-      let inStr = false
-      for (let k = 0; k < contentKeyMatch.index; k++) {
-        if (rawText[k] === '\\') {
-          k++ // skip escaped char
-          continue
-        }
-        if (rawText[k] === '"') {
-          inStr = !inStr
-          continue
-        }
-        if (!inStr && rawText[k] === '{') {
-          braceStart = k  // last { seen outside strings = JSON object start
-        }
-      }
-      if (braceStart !== -1) {
-        let depth = 0
-        let braceEnd = -1
-        for (let i = braceStart; i < rawText.length; i++) {
-          if (rawText[i] === '{') depth++
-          else if (rawText[i] === '}') {
-            depth--
-            if (depth === 0) { braceEnd = i + 1; break }
-          }
-        }
-        if (braceEnd > braceStart) {
-          try {
-            const sanitized = sanitizeJsonForParse(rawText.slice(braceStart, braceEnd))
-            const obj = JSON.parse(sanitized)
-            if (obj && typeof obj === 'object' && typeof (obj as any).content === 'string') {
-              const rawKeys = (obj as any).keys ?? (obj as any).keywords ?? (obj as any).key ?? (obj as any).tags ?? (obj as any).keyword_list ?? (obj as any).keywords_list
-              const extractedKeys = Array.isArray(rawKeys) ? rawKeys : []
-              return {
-                title: typeof (obj as any).title === 'string' ? (obj as any).title : (title || `Summary ${new Date().toLocaleDateString()}`),
-                content: (obj as any).content,
-                keys: extractedKeys.length > 0
-                  ? extractedKeys
-                  : extractContentKeywords((obj as any).content, (obj as any).title || ''),
-              }
-            }
-          } catch { /* fall through to content extraction */ }
-        }
-      }
-    }
-    // Final fallback: all parsing failed. Extract content field value with
-    // a state-machine scan — finds "content": "..." by tracking backslash
-    // escapes to locate the matching closing quote. Handles arbitrary field
-    // ordering and escaped quotes inside content.
-    const contentMatch = rawText.match(/"content"\s*:\s*"/)
-    if (contentMatch && contentMatch.index !== undefined) {
-      const start = contentMatch.index + contentMatch[0].length
-      let j = start
-      while (j < rawText.length) {
-        if (rawText[j] === '\\') {
-          j += 2  // skip backslash-escaped character
-          continue
-        }
-        if (rawText[j] === '"') {
-          let prose = rawText.slice(start, j)
-            .replace(/\\n/g, '\n')
-            .replace(/\\r/g, '\r')
-            .replace(/\\t/g, '\t')
-            .replace(/\\"/g, '"')
-            .replace(/\\\\/g, '\\')
-            .trim()
-          if (prose) {
-            const titleMatch = rawText.match(/"title"\s*:\s*"([^"]*)"/)
-            return {
-              title: (titleMatch ? titleMatch[1] : undefined) || title || `Summary ${new Date().toLocaleDateString()}`,
-              content: prose,
-              keys: extractContentKeywords(prose, title || ''),
-            }
-          }
-          break
-        }
-        j++
-      }
-    }
+    // All parsing strategies failed — return raw text as content
     return {
       title: title || `Summary ${new Date().toLocaleDateString()}`,
-      content: rawText,
-      keys: extractContentKeywords(rawText, title || ''),
+      content: text.trim(),
+      keys: extractContentKeywords(text.trim(), title || ''),
     }
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err)
